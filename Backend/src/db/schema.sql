@@ -169,3 +169,19 @@ CREATE TABLE IF NOT EXISTS order_items (
 CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_vendor_id ON order_items(vendor_id);
+
+-- ---------------------------------------------------------------------
+-- Sprint 4: Ratings & Reviews System (FR08 / UC07)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS reviews (
+    review_id    SERIAL PRIMARY KEY,
+    product_id   INTEGER NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    customer_id  INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
+    rating       INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment      TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_customer_id ON reviews(customer_id);

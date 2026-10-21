@@ -106,7 +106,7 @@ const editProduct = async (req, res) => {
 // FR04 — Product Search & Browse (customer side, public — no login needed).
 const getProducts = async (req, res) => {
   try {
-    const { category, vendor, q, page, limit } = req.query;
+    const { category, vendor, q, minPrice, maxPrice, sort, page, limit } = req.query;
     const pageNum = Math.max(1, Number(page) || 1);
     const limitNum = Math.min(50, Math.max(1, Number(limit) || 20));
 
@@ -114,6 +114,9 @@ const getProducts = async (req, res) => {
       categorySlug: category,
       vendorId: vendor,
       q,
+      minPrice,
+      maxPrice,
+      sort,
       page: pageNum,
       limit: limitNum,
     });

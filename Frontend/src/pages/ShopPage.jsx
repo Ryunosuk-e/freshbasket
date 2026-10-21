@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Loader2, Package, Search } from 'lucide-react';
+import { ArrowDownUp, Filter, Loader2, Package, Search, Star, Store, X } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader.jsx';
 import { browseProducts, getCategories } from '../api/products.js';
 
@@ -13,8 +13,15 @@ function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const category = searchParams.get('category') || '';
   const q = searchParams.get('q') || '';
+  const sort = searchParams.get('sort') || 'newest';
+  const minPriceParam = searchParams.get('minPrice') || '';
+  const maxPriceParam = searchParams.get('maxPrice') || '';
 
   const [searchInput, setSearchInput] = useState(q);
+  const [minPrice, setMinPrice] = useState(minPriceParam);
+  const [maxPrice, setMaxPrice] = useState(maxPriceParam);
+  const [showFilters, setShowFilters] = useState(false);
+
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
@@ -26,24 +33,32 @@ function ShopPage() {
   useEffect(() => {
     getCategories()
       .then((data) => setCategories(data.categories || []))
-      .catch(() => {
-        // Non-fatal — the category filter row just won't render.
-      });
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
     setSearchInput(q);
+    setMinPrice(minPriceParam);
+    setMaxPrice(maxPriceParam);
     setPage(1);
     setIsLoading(true);
     setLoadError('');
-    browseProducts({ q, category, page: 1 })
+
+    browseProducts({
+      q,
+      category,
+      sort,
+      minPrice: minPriceParam,
+      maxPrice: maxPriceParam,
+      page: 1,
+    })
       .then((data) => {
         setProducts(data.products || []);
         setTotal(data.total || 0);
       })
       .catch((err) => setLoadError(err.message || 'Could not load products.'))
       .finally(() => setIsLoading(false));
-  }, [q, category]);
+  }, [q, category, sort, minPriceParam, maxPriceParam]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
@@ -66,10 +81,46 @@ function ShopPage() {
     setSearchParams(next);
   };
 
+  const handleSortChange = (newSort) => {
+    const next = new URLSearchParams(searchParams);
+    if (newSort === 'newest') {
+      next.delete('sort');
+    } else {
+      next.set('sort', newSort);
+    }
+    setSearchParams(next);
+  };
+
+  const handlePriceFilterSubmit = (e) => {
+    e.preventDefault();
+    const next = new URLSearchParams(searchParams);
+    if (minPrice) next.set('minPrice', minPrice);
+    else next.delete('minPrice');
+
+    if (maxPrice) next.set('maxPrice', maxPrice);
+    else next.delete('maxPrice');
+
+    setSearchParams(next);
+  };
+
+  const handleClearFilters = () => {
+    setSearchInput('');
+    setMinPrice('');
+    setMaxPrice('');
+    setSearchParams(new URLSearchParams());
+  };
+
   const loadMore = () => {
     const nextPage = page + 1;
     setIsLoadingMore(true);
-    browseProducts({ q, category, page: nextPage })
+    browseProducts({
+      q,
+      category,
+      sort,
+      minPrice: minPriceParam,
+      maxPrice: maxPriceParam,
+      page: nextPage,
+    })
       .then((data) => {
         setProducts((prev) => [...prev, ...(data.products || [])]);
         setPage(nextPage);
@@ -78,50 +129,137 @@ function ShopPage() {
       .finally(() => setIsLoadingMore(false));
   };
 
+  const hasActiveFilters = Boolean(q || category || minPriceParam || maxPriceParam || sort !== 'newest');
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50/50">
       <PublicHeader />
 
       <main className="mx-auto max-w-6xl px-6 py-10 sm:px-12">
-        <h1 className="text-2xl font-semibold text-gray-900">Shop</h1>
-        <p className="mt-1 text-sm text-gray-500">Fresh groceries from verified Nsukka vendors.</p>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Explore Groceries</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Browse, compare prices across vendors, and order fresh food items in Nsukka.
+            </p>
+          </div>
 
+          {/* Sort Selector & Filter Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+                showFilters || minPriceParam || maxPriceParam
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-800'
+                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Filter size={13} />
+              <span>Price Filters</span>
+            </button>
+
+            <div className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700">
+              <ArrowDownUp size={13} className="text-gray-400" />
+              <select
+                value={sort}
+                onChange={(e) => handleSortChange(e.target.value)}
+                aria-label="Sort products by"
+                className="bg-transparent text-gray-800 focus:outline-hidden cursor-pointer"
+              >
+                <option value="newest">Sort: Newest</option>
+                <option value="price_asc">Price: Low to High (Cheapest)</option>
+                <option value="price_desc">Price: High to Low</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Search Bar */}
         <form onSubmit={handleSearchSubmit} className="mt-6 flex gap-2">
           <div className="relative flex-1">
             <Search size={16} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search for groceries…"
-              className="w-full rounded-full border border-gray-200 py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+              placeholder="Search for tomatoes, yams, rice, oil, meat…"
+              className="w-full rounded-full border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder:text-gray-400 focus:border-emerald-600 focus:outline-hidden focus:ring-2 focus:ring-emerald-600/20"
             />
           </div>
           <button
             type="submit"
-            className="rounded-full bg-emerald-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
+            className="rounded-full bg-emerald-800 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
           >
             Search
           </button>
         </form>
 
+        {/* Expandable Price Range Filter */}
+        {showFilters && (
+          <form
+            onSubmit={handlePriceFilterSubmit}
+            className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4"
+          >
+            <span className="text-xs font-bold text-emerald-900">Filter by Price:</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                placeholder="Min ₦"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                className="w-24 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-emerald-700 focus:outline-hidden"
+              />
+              <span className="text-gray-400 text-xs">to</span>
+              <input
+                type="number"
+                placeholder="Max ₦"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                className="w-24 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-emerald-700 focus:outline-hidden"
+              />
+            </div>
+            <button
+              type="submit"
+              className="rounded-full bg-emerald-800 px-4 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+            >
+              Apply Filter
+            </button>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleClearFilters}
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-red-600 ml-auto"
+              >
+                <X size={13} />
+                Reset All Filters
+              </button>
+            )}
+          </form>
+        )}
+
+        {/* Categories Row */}
         {categories.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => handleCategoryClick('')}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                !category ? 'bg-emerald-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                !category
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
               }`}
             >
-              All
+              All Categories
             </button>
             {categories.map((cat) => (
               <button
                 key={cat.category_id}
                 type="button"
                 onClick={() => handleCategoryClick(cat.slug)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                  category === cat.slug ? 'bg-emerald-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                  category === cat.slug
+                    ? 'bg-emerald-800 text-white shadow-xs'
+                    : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {cat.name}
@@ -130,68 +268,137 @@ function ShopPage() {
           </div>
         )}
 
+        {/* Results Area */}
         <div className="mt-8">
           {isLoading ? (
-            <div className="flex items-center gap-2 py-16 text-gray-400">
-              <Loader2 size={18} className="animate-spin" />
-              Loading products…
+            <div className="flex flex-col items-center justify-center gap-2 py-20 text-gray-400">
+              <Loader2 size={24} className="animate-spin text-emerald-700" />
+              <p className="text-sm">Finding fresh groceries…</p>
             </div>
           ) : loadError ? (
-            <div role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div role="alert" className="rounded-2xl bg-red-50 p-6 text-center text-sm text-red-700">
               {loadError}
             </div>
           ) : products.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-3xl bg-emerald-50 py-16 text-center">
-              <Package className="text-emerald-700" size={28} />
-              <p className="font-medium text-gray-900">No products found</p>
-              <p className="text-sm text-gray-500">
-                {q || category
-                  ? 'Try a different search or category.'
-                  : 'Vendors are still stocking up — check back soon.'}
+            <div className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-gray-200 bg-white py-16 text-center">
+              <Package className="text-gray-300" size={32} />
+              <p className="font-semibold text-gray-900">No matching products found</p>
+              <p className="text-xs text-gray-500 max-w-sm">
+                Try searching with another keyword or resetting price and category filters.
               </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="mt-2 rounded-full border border-gray-200 bg-gray-50 px-4 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           ) : (
             <>
-              <p className="text-sm text-gray-400">{total} product{total === 1 ? '' : 's'}</p>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>
+                  Showing <strong className="text-gray-900">{products.length}</strong> of{' '}
+                  <strong className="text-gray-900">{total}</strong> groceries
+                </span>
+                {sort === 'price_asc' && (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-emerald-800 font-semibold">
+                    Price Comparison: Cheapest First
+                  </span>
+                )}
+              </div>
+
+              {/* Products Grid */}
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {products.map((product) => {
-                  const primaryImage = product.images?.find((image) => image.isPrimary) || product.images?.[0];
+                  const primaryImage =
+                    product.images?.find((img) => img.isPrimary)?.imageUrl || product.images?.[0]?.imageUrl;
+
                   return (
-                    <Link
+                    <div
                       key={product.product_id}
-                      to={`/shop/${product.product_id}`}
-                      className="group rounded-2xl border border-gray-100 p-3 transition hover:border-emerald-200"
+                      className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-gray-200 bg-white p-3.5 transition hover:border-emerald-300 hover:shadow-md"
                     >
-                      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-gray-50">
-                        {primaryImage ? (
-                          <img
-                            src={primaryImage.imageUrl}
-                            alt=""
-                            className="h-full w-full object-cover transition group-hover:scale-105"
-                          />
-                        ) : (
-                          <Package className="text-gray-300" size={32} />
-                        )}
+                      <Link to={`/shop/${product.product_id}`}>
+                        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-gray-50">
+                          {primaryImage ? (
+                            <img
+                              src={primaryImage}
+                              alt={product.name}
+                              className="h-full w-full object-cover transition group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-gray-300">
+                              <Package size={32} />
+                            </div>
+                          )}
+                          {product.stock_quantity <= 0 && (
+                            <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                              Out of Stock
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+
+                      <div className="mt-3 flex flex-1 flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between text-[11px] text-gray-400">
+                            <span>{product.category_name}</span>
+                            {product.average_rating > 0 && (
+                              <span className="flex items-center gap-0.5 text-amber-600 font-bold">
+                                <Star size={11} className="fill-amber-400 text-amber-500" />
+                                {product.average_rating}
+                              </span>
+                            )}
+                          </div>
+
+                          <Link
+                            to={`/shop/${product.product_id}`}
+                            className="mt-1 line-clamp-1 text-sm font-bold text-gray-900 group-hover:text-emerald-800"
+                          >
+                            {product.name}
+                          </Link>
+
+                          {/* Clickable Vendor Store Link */}
+                          <Link
+                            to={`/shop/vendor/${product.vendor_id}`}
+                            className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-800 font-medium"
+                          >
+                            <Store size={12} className="text-emerald-700" />
+                            <span className="truncate">{product.shop_name}</span>
+                          </Link>
+                        </div>
+
+                        <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2.5">
+                          <p className="text-sm font-extrabold text-emerald-900">
+                            {formatNaira(product.price)}
+                            <span className="text-[11px] font-normal text-gray-400">/{product.unit}</span>
+                          </p>
+
+                          <Link
+                            to={`/shop/${product.product_id}`}
+                            className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                          >
+                            View
+                          </Link>
+                        </div>
                       </div>
-                      <p className="mt-3 line-clamp-1 text-sm font-medium text-gray-900">{product.name}</p>
-                      <p className="text-xs text-gray-400">{product.shop_name}</p>
-                      <p className="mt-1 text-sm font-semibold text-emerald-800">
-                        {formatNaira(product.price)} <span className="font-normal text-gray-400">/ {product.unit}</span>
-                      </p>
-                    </Link>
+                    </div>
                   );
                 })}
               </div>
 
               {products.length < total && (
-                <div className="mt-8 flex justify-center">
+                <div className="mt-10 flex justify-center">
                   <button
                     type="button"
                     onClick={loadMore}
                     disabled={isLoadingMore}
-                    className="rounded-full border border-gray-200 px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                    className="rounded-full border border-gray-200 bg-white px-6 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-xs disabled:opacity-60"
                   >
-                    {isLoadingMore ? 'Loading…' : 'Load more'}
+                    {isLoadingMore ? 'Loading…' : 'Load more groceries'}
                   </button>
                 </div>
               )}

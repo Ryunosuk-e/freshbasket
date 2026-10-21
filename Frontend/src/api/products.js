@@ -1,4 +1,4 @@
-import { API_BASE_URL, parseResponse } from './client.js';
+import { API_BASE_URL, authHeaders, parseResponse } from './client.js';
 
 export function getCategories() {
   return fetch(`${API_BASE_URL}/api/categories`).then(parseResponse);
@@ -11,8 +11,7 @@ export function getMyProducts(token) {
 }
 
 // Deliberately does NOT set Content-Type — the browser has to generate the
-// multipart boundary itself when the body is a FormData instance. Setting
-// it manually here would break every upload.
+// multipart boundary itself when the body is a FormData instance.
 function buildProductFormData(fields, imageFiles) {
   const formData = new FormData();
   Object.entries(fields).forEach(([key, value]) => {
@@ -40,17 +39,27 @@ export function updateProduct(token, productId, fields, imageFiles = []) {
   }).then(parseResponse);
 }
 
-// Public — no token. { category } is a slug (e.g. "fruits-vegetables"),
-// matching the ones seeded in the backend and used on the landing page.
-export function browseProducts({ q, category, page = 1, limit = 20 } = {}) {
+// Public — no token needed.
+export function browseProducts({ q, category, vendor, minPrice, maxPrice, sort, page = 1, limit = 20 } = {}) {
   const params = new URLSearchParams();
   if (q) params.set('q', q);
   if (category) params.set('category', category);
-  params.set('page', page);
-  params.set('limit', limit);
-  return fetch(`${API_BASE_URL}/api/products?${params.toString()}`).then(parseResponse);
+  if (vendor) params.set('vendor', vendor);
+  if (minPrice) params.set('minPrice', minPrice);
+  if (maxPrice) params.set('maxPrice', maxPrice);
+  if (sort) params.set('sort', sort);
+  if (page > 1) params.set('page', String(page));
+  if (limit !== 20) params.set('limit', String(limit));
+
+  const qs = params.toString();
+  return fetch(`${API_BASE_URL}/api/products${qs ? `?${qs}` : ''}`).then(parseResponse);
 }
 
 export function getProduct(productId) {
   return fetch(`${API_BASE_URL}/api/products/${productId}`).then(parseResponse);
+}
+
+export function getVendorPublicProfile(vendorId, token) {
+  const headers = token ? authHeaders(token) : {};
+  return fetch(`${API_BASE_URL}/api/vendors/${vendorId}`, { headers }).then(parseResponse);
 }

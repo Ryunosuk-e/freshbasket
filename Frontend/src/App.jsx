@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import LandingPage from './pages/LandingPage.jsx';
 import ShopPage from './pages/ShopPage.jsx';
 import ProductDetailPage from './pages/ProductDetailPage.jsx';
+import VendorStorePage from './pages/VendorStorePage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import SignInPage from './pages/SignInPage.jsx';
 import CompleteProfilePage from './pages/CompleteProfilePage.jsx';
@@ -22,6 +23,7 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/shop" element={<ShopPage />} />
       <Route path="/shop/:productId" element={<ProductDetailPage />} />
+      <Route path="/shop/vendor/:vendorId" element={<VendorStorePage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/sign-in" element={<SignInPage />} />
       <Route
