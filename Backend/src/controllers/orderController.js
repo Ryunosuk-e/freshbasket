@@ -1,4 +1,12 @@
-const { createOrderFromCart, findOrderById, listOrdersByCustomer, computeCartTotal } = require('../models/orderModel');
+const {
+  createOrderFromCart,
+  findOrderById,
+  listOrdersByCustomer,
+  listOrdersByVendor,
+  updateOrderStatus,
+  listAllOrdersForAdmin,
+  computeCartTotal,
+} = require('../models/orderModel');
 const { getCartWithItems } = require('../models/cartModel');
 const { isPaystackConfigured, verifyPaystackTransaction } = require('../utils/paystack');
 
@@ -87,11 +95,53 @@ const getMyOrders = async (req, res) => {
   }
 };
 
+const getVendorOrders = async (req, res) => {
+  try {
+    const orders = await listOrdersByVendor(req.user.userId);
+    return res.status(200).json({ orders });
+  } catch (err) {
+    console.error('getVendorOrders error:', err);
+    return res.status(500).json({ message: 'Could not fetch shop orders.' });
+  }
+};
+
+const updateStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!status) {
+      return res.status(400).json({ message: 'status is required.' });
+    }
+    const vendorId = req.user.role === 'vendor' ? req.user.userId : null;
+    const order = await updateOrderStatus(req.params.orderId, status, vendorId);
+    return res.status(200).json({ message: 'Order status updated.', order });
+  } catch (err) {
+    console.error('updateStatus error:', err);
+    return res.status(400).json({ message: err.message || 'Could not update order status.' });
+  }
+};
+
+const getAdminOrders = async (req, res) => {
+  try {
+    const orders = await listAllOrdersForAdmin();
+    return res.status(200).json({ orders });
+  } catch (err) {
+    console.error('getAdminOrders error:', err);
+    return res.status(500).json({ message: 'Could not fetch platform orders.' });
+  }
+};
+
 const getOrderDetail = async (req, res) => {
   try {
-    const order = await findOrderById(req.params.orderId, req.user.userId);
+    const customerId = req.user.role === 'customer' ? req.user.userId : null;
+    const order = await findOrderById(req.params.orderId, customerId);
     if (!order) {
       return res.status(404).json({ message: 'Order not found.' });
+    }
+    if (req.user.role === 'vendor') {
+      const hasItem = order.items.some((item) => item.vendor_id === req.user.userId);
+      if (!hasItem) {
+        return res.status(403).json({ message: 'You do not have items in this order.' });
+      }
     }
     return res.status(200).json({ order });
   } catch (err) {
@@ -100,4 +150,12 @@ const getOrderDetail = async (req, res) => {
   }
 };
 
-module.exports = { getCheckoutSummary, placeOrder, getMyOrders, getOrderDetail };
+module.exports = {
+  getCheckoutSummary,
+  placeOrder,
+  getMyOrders,
+  getVendorOrders,
+  updateStatus,
+  getAdminOrders,
+  getOrderDetail,
+};

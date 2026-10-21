@@ -8,8 +8,10 @@ import CompleteProfilePage from './pages/CompleteProfilePage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
 import VendorProductsPage from './pages/VendorProductsPage.jsx';
+import VendorOrdersPage from './pages/VendorOrdersPage.jsx';
 import CartPage from './pages/CartPage.jsx';
 import CheckoutPage from './pages/CheckoutPage.jsx';
+import OrdersPage from './pages/OrdersPage.jsx';
 import OrderDetailPage from './pages/OrderDetailPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -54,6 +56,14 @@ function App() {
         }
       />
       <Route
+        path="/vendor/orders"
+        element={
+          <ProtectedRoute allowedRoles={['vendor']}>
+            <VendorOrdersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/cart"
         element={
           <ProtectedRoute allowedRoles={['customer']}>
@@ -70,9 +80,17 @@ function App() {
         }
       />
       <Route
-        path="/orders/:orderId"
+        path="/orders"
         element={
           <ProtectedRoute allowedRoles={['customer']}>
+            <OrdersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/orders/:orderId"
+        element={
+          <ProtectedRoute allowedRoles={['customer', 'vendor']}>
             <OrderDetailPage />
           </ProtectedRoute>
         }

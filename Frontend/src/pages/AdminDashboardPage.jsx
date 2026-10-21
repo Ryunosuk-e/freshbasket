@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Check, Loader2, RefreshCw, Store, Users, X } from 'lucide-react';
+import { Check, Loader2, Package, RefreshCw, ShoppingBag, Store, Users, X } from 'lucide-react';
 import AppHeader from '../components/AppHeader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
+  getAdminOrders,
   getAllCustomers,
   getAllVendors,
   getPendingVendors,
@@ -11,16 +12,27 @@ import {
   verifyVendor,
 } from '../api/admin.js';
 
+function formatNaira(amount) {
+  return `\u20a6${Number(amount).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 const TABS = [
   { key: 'pending', label: 'Pending Applications' },
   { key: 'vendors', label: 'All Vendors' },
   { key: 'customers', label: 'All Customers' },
+  { key: 'orders', label: 'Platform Orders' },
 ];
 
 const STATUS_STYLES = {
   pending: 'bg-amber-50 text-amber-700',
   verified: 'bg-emerald-50 text-emerald-700',
   rejected: 'bg-red-50 text-red-700',
+  placed: 'bg-amber-50 text-amber-700',
+  confirmed: 'bg-blue-50 text-blue-700',
+  preparing: 'bg-indigo-50 text-indigo-700',
+  out_for_delivery: 'bg-purple-50 text-purple-700',
+  delivered: 'bg-emerald-50 text-emerald-700',
+  cancelled: 'bg-red-50 text-red-700',
 };
 
 function formatDate(isoString) {
@@ -79,12 +91,14 @@ function AdminDashboardPage() {
   const [allCustomersLoading, setAllCustomersLoading] = useState(false);
   const [allCustomersError, setAllCustomersError] = useState('');
 
+  const [allOrders, setAllOrders] = useState(null);
+  const [allOrdersLoading, setAllOrdersLoading] = useState(false);
+  const [allOrdersError, setAllOrdersError] = useState('');
+
   const loadStats = () => {
     getPlatformStats(token)
       .then((data) => setStats(data.stats))
-      .catch(() => {
-        // Non-fatal — the cards just show "—" instead of blocking the page.
-      });
+      .catch(() => {});
   };
 
   const loadPending = () => {
@@ -96,7 +110,6 @@ function AdminDashboardPage() {
       .finally(() => setPendingLoading(false));
   };
 
-  // Fetched once on first visit to each tab, not on every switch.
   const loadAllVendors = () => {
     setAllVendorsLoading(true);
     setAllVendorsError('');
@@ -115,6 +128,15 @@ function AdminDashboardPage() {
       .finally(() => setAllCustomersLoading(false));
   };
 
+  const loadAllOrders = () => {
+    setAllOrdersLoading(true);
+    setAllOrdersError('');
+    getAdminOrders(token)
+      .then((data) => setAllOrders(data.orders || []))
+      .catch((err) => setAllOrdersError(err.message || 'Could not load orders.'))
+      .finally(() => setAllOrdersLoading(false));
+  };
+
   useEffect(() => {
     loadStats();
     loadPending();
@@ -125,6 +147,7 @@ function AdminDashboardPage() {
     setActiveTab(key);
     if (key === 'vendors' && allVendors === null) loadAllVendors();
     if (key === 'customers' && allCustomers === null) loadAllCustomers();
+    if (key === 'orders' && allOrders === null) loadAllOrders();
   };
 
   const handleDecision = async (vendorId, decision) => {
@@ -138,10 +161,10 @@ function AdminDashboardPage() {
       const action = decision === 'verify' ? verifyVendor : rejectVendor;
       await action(token, vendorId);
       setPendingVendors((prev) => prev.filter((vendor) => vendor.user_id !== vendorId));
-      setAllVendors(null); // stale now — refetch next time that tab is opened
       loadStats();
+      if (allVendors !== null) loadAllVendors();
     } catch (err) {
-      setActionError(err.message || 'Something went wrong. Please try again.');
+      setActionError(err.message || `Could not ${decision} this vendor.`);
     } finally {
       setActioningId(null);
     }
@@ -151,48 +174,64 @@ function AdminDashboardPage() {
     <div className="min-h-screen bg-white">
       <AppHeader tag="Admin" />
 
-      <main className="mx-auto max-w-4xl px-6 py-12 sm:px-12">
+      <main className="mx-auto max-w-5xl px-6 py-10 sm:px-12">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Admin Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">Signed in as {user?.full_name}</p>
+          <p className="mt-1 text-sm text-gray-500">Overview of users, vendor applications, and orders across FreshBasket.</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <StatCard label="Customers" value={stats?.total_customers} />
-          <StatCard label="Vendors" value={stats?.total_vendors} />
-          <StatCard label="Pending" value={stats?.pending_vendors} />
-          <StatCard label="Verified" value={stats?.verified_vendors} />
-          <StatCard label="Rejected" value={stats?.rejected_vendors} />
+        {/* Stats Row */}
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Total Customers" value={stats?.customersCount} />
+          <StatCard label="Pending Vendors" value={stats?.pendingVendorsCount} />
+          <StatCard label="Verified Vendors" value={stats?.verifiedVendorsCount} />
+          <StatCard label="Rejected Vendors" value={stats?.rejectedVendorsCount} />
         </div>
 
-        <div className="mt-8 flex gap-1 rounded-full bg-gray-100 p-1 sm:inline-flex">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => handleTabChange(tab.key)}
-              className={`flex-1 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition sm:flex-none ${
-                activeTab === tab.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Tab Controls */}
+        <div className="mt-8 flex gap-2 border-b border-gray-100 pb-3">
+          {TABS.map((tab) => {
+            const isSelected = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => handleTabChange(tab.key)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  isSelected
+                    ? 'bg-emerald-800 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {tab.label}
+                {tab.key === 'pending' && pendingVendors.length > 0 && (
+                  <span
+                    className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${
+                      isSelected ? 'bg-emerald-700 text-white' : 'bg-amber-100 text-amber-800'
+                    }`}
+                  >
+                    {pendingVendors.length}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {actionError && (
-          <div role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
-            {actionError}
-          </div>
-        )}
-
+        {/* Active Tab Content */}
         <div className="mt-6">
+          {actionError && (
+            <div role="alert" className="mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+              {actionError}
+            </div>
+          )}
+
           {activeTab === 'pending' && (
             <>
               {pendingLoading ? (
                 <div className="flex items-center gap-2 py-16 text-gray-400">
                   <Loader2 size={18} className="animate-spin" />
-                  Loading applications…
+                  Loading pending applications…
                 </div>
               ) : pendingError ? (
                 <div role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -327,6 +366,49 @@ function AdminDashboardPage() {
               )}
             </>
           )}
+
+          {activeTab === 'orders' && (
+            <>
+              {allOrdersLoading ? (
+                <div className="flex items-center gap-2 py-16 text-gray-400">
+                  <Loader2 size={18} className="animate-spin" />
+                  Loading platform orders…
+                </div>
+              ) : allOrdersError ? (
+                <div role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {allOrdersError}
+                </div>
+              ) : !allOrders || allOrders.length === 0 ? (
+                <EmptyState icon={Package} title="No orders yet" subtitle="Customer orders placed on the platform will appear here." />
+              ) : (
+                <div className="space-y-3">
+                  {allOrders.map((ord) => (
+                    <div key={ord.order_id} className="rounded-2xl border border-gray-100 p-4 sm:flex sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-gray-900">Order #{ord.order_id}</span>
+                          <StatusBadge status={ord.order_status} />
+                          <span className="rounded-full bg-gray-50 px-2 py-0.5 text-xs text-gray-500">
+                            {ord.payment_method === 'card' ? 'Card' : 'Cash'} ({ord.payment_status})
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-gray-600">
+                          Buyer: <span className="font-medium text-gray-900">{ord.customer_name}</span> ({ord.customer_phone || ord.customer_email})
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Delivery: {ord.delivery_address} · {formatDate(ord.created_at)}
+                        </p>
+                      </div>
+                      <div className="mt-3 text-left sm:mt-0 sm:text-right">
+                        <p className="text-base font-bold text-emerald-800">{formatNaira(ord.total_amount)}</p>
+                        <p className="text-xs text-gray-400">{ord.item_count || 1} items</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         <button
@@ -336,6 +418,7 @@ function AdminDashboardPage() {
             if (activeTab === 'pending') loadPending();
             if (activeTab === 'vendors') loadAllVendors();
             if (activeTab === 'customers') loadAllCustomers();
+            if (activeTab === 'orders') loadAllOrders();
           }}
           className="mt-8 flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-gray-700"
         >

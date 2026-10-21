@@ -32,14 +32,22 @@ function PublicHeader({ links = [] }) {
 
       <div className="flex items-center gap-3">
         {isCustomer && (
-          <Link to="/cart" className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-50">
-            <ShoppingCart size={20} className="text-gray-700" />
-            {itemCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-emerald-800 px-1 text-[10px] font-semibold text-white">
-                {itemCount}
-              </span>
-            )}
-          </Link>
+          <>
+            <Link
+              to="/orders"
+              className="hidden sm:inline-block text-xs font-semibold text-gray-600 hover:text-emerald-800"
+            >
+              My Orders
+            </Link>
+            <Link to="/cart" className="relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-gray-50">
+              <ShoppingCart size={20} className="text-gray-700" />
+              {itemCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-emerald-800 px-1 text-[10px] font-semibold text-white">
+                  {itemCount}
+                </span>
+              )}
+            </Link>
+          </>
         )}
         {isAuthenticated ? (
           <Link

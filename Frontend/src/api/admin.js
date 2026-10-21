@@ -29,3 +29,7 @@ export function rejectVendor(token, vendorId) {
     headers: authHeaders(token),
   }).then(parseResponse);
 }
+
+export function getAdminOrders(token) {
+  return fetch(`${API_BASE_URL}/api/admin/orders`, { headers: authHeaders(token) }).then(parseResponse);
+}

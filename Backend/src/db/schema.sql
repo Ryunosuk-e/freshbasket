@@ -142,10 +142,18 @@ CREATE TABLE IF NOT EXISTS orders (
     payment_method     VARCHAR(20) NOT NULL CHECK (payment_method IN ('card', 'cash_on_delivery')),
     payment_status     VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed')),
     payment_reference  VARCHAR(100),
-    order_status       VARCHAR(20) NOT NULL DEFAULT 'placed' CHECK (order_status IN ('placed', 'confirmed', 'cancelled')),
+    order_status       VARCHAR(20) NOT NULL DEFAULT 'placed' CHECK (order_status IN ('placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled')),
     total_amount       NUMERIC(10,2) NOT NULL,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DO $$ BEGIN
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_order_status_check;
+    ALTER TABLE orders ADD CONSTRAINT orders_order_status_check
+        CHECK (order_status IN ('placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'));
+EXCEPTION
+    WHEN others THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS order_items (
     order_item_id  SERIAL PRIMARY KEY,

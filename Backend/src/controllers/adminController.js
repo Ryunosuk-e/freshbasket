@@ -1,6 +1,7 @@
 const { getPlatformStats } = require('../models/adminModel');
 const { listAllVendors } = require('../models/vendorModel');
 const { listAllCustomers } = require('../models/customerModel');
+const { listAllOrdersForAdmin } = require('../models/orderModel');
 
 const VALID_STATUSES = ['pending', 'verified', 'rejected'];
 
@@ -38,4 +39,14 @@ const getCustomers = async (req, res) => {
   }
 };
 
-module.exports = { getStats, getVendors, getCustomers };
+const getOrders = async (req, res) => {
+  try {
+    const orders = await listAllOrdersForAdmin();
+    return res.status(200).json({ orders });
+  } catch (err) {
+    console.error('getOrders error:', err);
+    return res.status(500).json({ message: 'Could not fetch platform orders.' });
+  }
+};
+
+module.exports = { getStats, getVendors, getCustomers, getOrders };

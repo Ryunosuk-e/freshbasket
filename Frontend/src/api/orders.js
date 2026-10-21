@@ -19,3 +19,19 @@ export function getMyOrders(token) {
 export function getOrder(token, orderId) {
   return fetch(`${API_BASE_URL}/api/orders/${orderId}`, { headers: authHeaders(token) }).then(parseResponse);
 }
+
+export function getVendorOrders(token) {
+  return fetch(`${API_BASE_URL}/api/orders/vendor`, { headers: authHeaders(token) }).then(parseResponse);
+}
+
+export function updateOrderStatus(token, orderId, status) {
+  return fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ status }),
+  }).then(parseResponse);
+}
+
+export function getAdminOrders(token) {
+  return fetch(`${API_BASE_URL}/api/admin/orders`, { headers: authHeaders(token) }).then(parseResponse);
+}
