@@ -1,4 +1,4 @@
-const { findCustomerByUserId, completeCustomerProfile } = require('../models/customerModel');
+const { findCustomerByUserId, updateCustomerProfile } = require('../models/customerModel');
 
 const PAYMENT_METHODS = ['card', 'cash_on_delivery'];
 
@@ -15,31 +15,28 @@ const getMyProfile = async (req, res) => {
   }
 };
 
-// Backs the Complete Your Profile step for customers — delivery address
-// becomes required here even though it was optional at registration.
 const updateMyProfile = async (req, res) => {
   try {
-    const { deliveryAddress, preferredPaymentMethod } = req.body;
+    const { fullName, phoneNumber, deliveryAddress, preferredPaymentMethod } = req.body;
 
-    if (!deliveryAddress || !deliveryAddress.trim()) {
-      return res.status(400).json({ message: 'Delivery address is required.' });
-    }
     if (preferredPaymentMethod && !PAYMENT_METHODS.includes(preferredPaymentMethod)) {
       return res.status(400).json({
         message: `preferredPaymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}.`,
       });
     }
 
-    const customer = await completeCustomerProfile({
+    const customer = await updateCustomerProfile({
       customerId: req.user.userId,
-      defaultDeliveryAddress: deliveryAddress,
-      preferredPaymentMethod: preferredPaymentMethod || null,
+      fullName: fullName?.trim() || null,
+      phoneNumber: phoneNumber?.trim() || null,
+      defaultDeliveryAddress: deliveryAddress?.trim() !== undefined ? deliveryAddress.trim() : undefined,
+      preferredPaymentMethod: preferredPaymentMethod || undefined,
     });
 
-    return res.status(200).json({ message: 'Profile completed.', customer });
+    return res.status(200).json({ message: 'Profile updated successfully.', customer });
   } catch (err) {
     console.error('updateMyProfile (customer) error:', err);
-    return res.status(500).json({ message: 'Could not update your profile.' });
+    return res.status(500).json({ message: err.message || 'Could not update your profile.' });
   }
 };
 

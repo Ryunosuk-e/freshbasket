@@ -115,4 +115,37 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { registerCustomer, registerVendor, login };
+const pool = require('../config/db');
+
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'currentPassword and newPassword are required.' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
+    }
+
+    const userResult = await pool.query('SELECT * FROM users WHERE user_id = $1', [req.user.userId]);
+    const user = userResult.rows[0];
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const passwordMatches = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!passwordMatches) {
+      return res.status(400).json({ message: 'Current password is incorrect.' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await pool.query('UPDATE users SET password_hash = $2 WHERE user_id = $1', [req.user.userId, newHash]);
+
+    return res.status(200).json({ message: 'Password updated successfully.' });
+  } catch (err) {
+    console.error('changePassword error:', err);
+    return res.status(500).json({ message: 'Could not update password.' });
+  }
+};
+
+module.exports = { registerCustomer, registerVendor, login, changePassword };

@@ -1,4 +1,4 @@
-import { API_BASE_URL, parseResponse } from './client.js';
+import { API_BASE_URL, authHeaders, parseResponse } from './client.js';
 
 export function registerCustomer(payload) {
   return fetch(`${API_BASE_URL}/api/auth/register/customer`, {
@@ -20,6 +20,14 @@ export function login(payload) {
   return fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(parseResponse);
+}
+
+export function changePassword(token, payload) {
+  return fetch(`${API_BASE_URL}/api/auth/change-password`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
     body: JSON.stringify(payload),
   }).then(parseResponse);
 }

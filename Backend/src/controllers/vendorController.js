@@ -2,7 +2,7 @@ const {
   listPendingVendors,
   setVendorVerificationStatus,
   findVendorById,
-  completeVendorProfile,
+  updateVendorProfile,
 } = require('../models/vendorModel');
 
 // UC08 — Admin: Verify Vendor Applications (the review queue).
@@ -55,9 +55,6 @@ const getVendorProfile = async (req, res) => {
   }
 };
 
-// A vendor viewing/completing their OWN profile — identity comes from the
-// JWT (req.user.userId), never from a URL param, so a vendor can't
-// accidentally (or deliberately) look up someone else's account this way.
 const getMyProfile = async (req, res) => {
   try {
     const vendor = await findVendorById(req.user.userId);
@@ -71,28 +68,46 @@ const getMyProfile = async (req, res) => {
   }
 };
 
-// Backs the Complete Your Profile step for vendors — payout bank details,
-// which registration deliberately never asks for.
 const updateMyProfile = async (req, res) => {
   try {
-    const { bankName, accountNumber, accountName } = req.body;
+    const {
+      ownerName,
+      phoneNumber,
+      shopName,
+      businessAddress,
+      category,
+      bankName,
+      accountNumber,
+      accountName,
+    } = req.body;
 
-    if (!bankName || !accountNumber || !accountName) {
-      return res.status(400).json({ message: 'bankName, accountNumber and accountName are all required.' });
-    }
-    if (!/^\d{10}$/.test(accountNumber)) {
-      return res.status(400).json({ message: 'accountNumber must be exactly 10 digits.' });
+    let bankDetails = undefined;
+    if (bankName || accountNumber || accountName) {
+      if (!bankName || !accountNumber || !accountName) {
+        return res.status(400).json({
+          message: 'bankName, accountNumber, and accountName are all required when updating bank details.',
+        });
+      }
+      if (!/^\d{10}$/.test(accountNumber)) {
+        return res.status(400).json({ message: 'accountNumber must be exactly 10 digits.' });
+      }
+      bankDetails = { bankName, accountNumber, accountName };
     }
 
-    const vendor = await completeVendorProfile({
+    const vendor = await updateVendorProfile({
       vendorId: req.user.userId,
-      bankDetails: { bankName, accountNumber, accountName },
+      fullName: ownerName?.trim() || null,
+      phoneNumber: phoneNumber?.trim() || null,
+      shopName: shopName?.trim() || undefined,
+      businessAddress: businessAddress?.trim() || undefined,
+      category: category?.trim() || undefined,
+      bankDetails,
     });
 
-    return res.status(200).json({ message: 'Profile completed.', vendor });
+    return res.status(200).json({ message: 'Profile updated successfully.', vendor });
   } catch (err) {
     console.error('updateMyProfile (vendor) error:', err);
-    return res.status(500).json({ message: 'Could not update your profile.' });
+    return res.status(500).json({ message: err.message || 'Could not update your profile.' });
   }
 };
 

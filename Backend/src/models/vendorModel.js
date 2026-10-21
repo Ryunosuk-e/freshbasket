@@ -36,9 +36,7 @@ const listPendingVendors = async () => {
   return result.rows;
 };
 
-// Setting status to 'verified' also flips users.is_verified so the vendor's
-// storefront (and their ability to log in — see authController.login) opens
-// up immediately, without a second admin action.
+// Setting status to 'verified' also flips users.is_verified
 const setVendorVerificationStatus = async (vendorId, status) => {
   const result = await pool.query(
     `UPDATE vendors SET verification_status = $2 WHERE vendor_id = $1 RETURNING *`,
@@ -51,19 +49,63 @@ const setVendorVerificationStatus = async (vendorId, status) => {
   return vendor;
 };
 
-// Saves payout bank details and marks the account's profile as completed,
-// in one transaction — mirrors completeCustomerProfile in customerModel.js.
+// Saves payout bank details and marks the account's profile as completed
 const completeVendorProfile = async ({ vendorId, bankDetails }) => {
+  return updateVendorProfile({ vendorId, bankDetails });
+};
+
+// Allows full profile update: owner name, phone, shop name, address, category, bank details
+const updateVendorProfile = async ({
+  vendorId,
+  fullName,
+  phoneNumber,
+  shopName,
+  businessAddress,
+  category,
+  bankDetails,
+}) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const result = await client.query(
-      `UPDATE vendors SET bank_details = $2 WHERE vendor_id = $1 RETURNING *`,
-      [vendorId, bankDetails]
-    );
-    await client.query('UPDATE users SET profile_completed = TRUE WHERE user_id = $1', [vendorId]);
+
+    if (fullName || phoneNumber) {
+      await client.query(
+        `UPDATE users
+         SET full_name = COALESCE($2, full_name),
+             phone_number = COALESCE($3, phone_number),
+             profile_completed = TRUE
+         WHERE user_id = $1`,
+        [vendorId, fullName || null, phoneNumber || null]
+      );
+    } else {
+      await client.query('UPDATE users SET profile_completed = TRUE WHERE user_id = $1', [vendorId]);
+    }
+
+    if (
+      shopName !== undefined ||
+      businessAddress !== undefined ||
+      category !== undefined ||
+      bankDetails !== undefined
+    ) {
+      await client.query(
+        `UPDATE vendors
+         SET shop_name = COALESCE($2, shop_name),
+             business_address = COALESCE($3, business_address),
+             category = COALESCE($4, category),
+             bank_details = COALESCE($5, bank_details)
+         WHERE vendor_id = $1`,
+        [
+          vendorId,
+          shopName || null,
+          businessAddress || null,
+          category || null,
+          bankDetails ? JSON.stringify(bankDetails) : null,
+        ]
+      );
+    }
+
     await client.query('COMMIT');
-    return result.rows[0];
+    return findVendorById(vendorId);
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -72,8 +114,7 @@ const completeVendorProfile = async ({ vendorId, bankDetails }) => {
   }
 };
 
-// Backs the admin dashboard's "All Vendors" view — every vendor regardless
-// of status, optionally filtered to one (?status=pending|verified|rejected).
+// Backs the admin dashboard's "All Vendors" view
 const listAllVendors = async ({ status } = {}) => {
   const params = [];
   let whereClause = '';
@@ -102,4 +143,5 @@ module.exports = {
   listAllVendors,
   setVendorVerificationStatus,
   completeVendorProfile,
+  updateVendorProfile,
 };

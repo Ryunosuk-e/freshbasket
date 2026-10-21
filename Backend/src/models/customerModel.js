@@ -22,23 +22,48 @@ const findCustomerByUserId = async (customerId) => {
   return result.rows[0];
 };
 
-// Saves the Complete Your Profile fields and marks the account complete in
-// one transaction, so the two tables can't end up out of sync if the second
-// query somehow failed on its own.
+// Saves the Complete Your Profile fields and marks the account complete
 const completeCustomerProfile = async ({ customerId, defaultDeliveryAddress, preferredPaymentMethod }) => {
+  return updateCustomerProfile({ customerId, defaultDeliveryAddress, preferredPaymentMethod });
+};
+
+// Allows full profile update: name, phone, address, payment method
+const updateCustomerProfile = async ({
+  customerId,
+  fullName,
+  phoneNumber,
+  defaultDeliveryAddress,
+  preferredPaymentMethod,
+}) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const result = await client.query(
-      `UPDATE customers
-       SET default_delivery_address = $2, preferred_payment_method = $3
-       WHERE customer_id = $1
-       RETURNING *`,
-      [customerId, defaultDeliveryAddress, preferredPaymentMethod]
-    );
-    await client.query('UPDATE users SET profile_completed = TRUE WHERE user_id = $1', [customerId]);
+
+    if (fullName || phoneNumber) {
+      await client.query(
+        `UPDATE users
+         SET full_name = COALESCE($2, full_name),
+             phone_number = COALESCE($3, phone_number),
+             profile_completed = TRUE
+         WHERE user_id = $1`,
+        [customerId, fullName || null, phoneNumber || null]
+      );
+    } else {
+      await client.query('UPDATE users SET profile_completed = TRUE WHERE user_id = $1', [customerId]);
+    }
+
+    if (defaultDeliveryAddress !== undefined || preferredPaymentMethod !== undefined) {
+      await client.query(
+        `UPDATE customers
+         SET default_delivery_address = COALESCE($2, default_delivery_address),
+             preferred_payment_method = COALESCE($3, preferred_payment_method)
+         WHERE customer_id = $1`,
+        [customerId, defaultDeliveryAddress || null, preferredPaymentMethod || null]
+      );
+    }
+
     await client.query('COMMIT');
-    return result.rows[0];
+    return findCustomerByUserId(customerId);
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -59,5 +84,10 @@ const listAllCustomers = async () => {
   return result.rows;
 };
 
-module.exports = { createCustomerProfile, findCustomerByUserId, completeCustomerProfile, listAllCustomers };
-
+module.exports = {
+  createCustomerProfile,
+  findCustomerByUserId,
+  completeCustomerProfile,
+  updateCustomerProfile,
+  listAllCustomers,
+};

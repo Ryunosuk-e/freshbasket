@@ -3,9 +3,7 @@ import {
   Leaf,
   LogOut,
   Package,
-  ShoppingBag,
   ShoppingCart,
-  Store,
   User,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -133,15 +131,29 @@ function AppHeader({ tag }) {
               Admin Control
             </Link>
           )}
+
+          <Link
+            to="/profile"
+            className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 transition ${
+              isActive('/profile') ? 'bg-emerald-50 font-semibold text-emerald-800' : 'hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            <User size={15} />
+            <span className="hidden sm:inline">Settings</span>
+          </Link>
         </nav>
 
         {/* Right side controls */}
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden md:flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs">
-            <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+          <Link
+            to="/profile"
+            className="hidden md:flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs hover:border-emerald-300 hover:bg-emerald-50/40 transition"
+            title="Account Settings"
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-600" />
             <span className="font-semibold text-gray-800 truncate max-w-[120px]">{user?.full_name?.split(' ')[0]}</span>
             <span className="capitalize text-gray-400">({user?.role})</span>
-          </div>
+          </Link>
 
           <button
             type="button"

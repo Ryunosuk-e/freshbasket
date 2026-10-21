@@ -13,6 +13,7 @@ import CartPage from './pages/CartPage.jsx';
 import CheckoutPage from './pages/CheckoutPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import OrderDetailPage from './pages/OrderDetailPage.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function App() {
@@ -92,6 +93,14 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['customer', 'vendor']}>
             <OrderDetailPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute allowedRoles={['customer', 'vendor', 'admin']}>
+            <ProfilePage />
           </ProtectedRoute>
         }
       />
