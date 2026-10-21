@@ -36,3 +36,4 @@ cp .env.example .env
 # Start Vite development server
 npm run dev
 ```
+
