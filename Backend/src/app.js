@@ -15,6 +15,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const disputeRoutes = require('./routes/disputeRoutes');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/deliveries', deliveryRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/disputes', disputeRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found.' });

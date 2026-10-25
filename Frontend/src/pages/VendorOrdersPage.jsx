@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import AppHeader from '../components/AppHeader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { getVendorOrders, updateOrderStatus } from '../api/orders.js';
+import { getVendorOrders, updateOrderStatus, confirmOrderPayment } from '../api/orders.js';
 
 function formatNaira(amount) {
   return `\u20a6${Number(amount).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -79,10 +79,33 @@ function VendorOrdersPage() {
     try {
       await updateOrderStatus(token, orderId, newStatus);
       setOrders((prev) =>
-        prev.map((ord) => (ord.order_id === orderId ? { ...ord, order_status: newStatus } : ord))
+        prev.map((ord) =>
+          ord.order_id === orderId
+            ? {
+                ...ord,
+                order_status: newStatus,
+                payment_status: newStatus === 'delivered' ? 'paid' : ord.payment_status,
+              }
+            : ord
+        )
       );
     } catch (err) {
       setActionError(err.message || 'Could not update order status.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleConfirmPayment = async (orderId) => {
+    setUpdatingId(orderId);
+    setActionError('');
+    try {
+      await confirmOrderPayment(token, orderId);
+      setOrders((prev) =>
+        prev.map((ord) => (ord.order_id === orderId ? { ...ord, payment_status: 'paid' } : ord))
+      );
+    } catch (err) {
+      setActionError(err.message || 'Could not confirm payment.');
     } finally {
       setUpdatingId(null);
     }
@@ -232,7 +255,9 @@ function VendorOrdersPage() {
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
                     <div>
                       <div className="flex items-center gap-2.5">
-                        <span className="text-lg font-bold text-gray-900">Order #{order.order_id}</span>
+                        <span className="text-lg font-bold text-gray-900">
+                          Order {order.order_code || `#${order.order_id}`}
+                        </span>
                         <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${statusCfg.style}`}>
                           {statusCfg.label}
                         </span>
@@ -251,7 +276,7 @@ function VendorOrdersPage() {
 
                   {/* Customer & Delivery Details */}
                   <div className="mt-4 grid grid-cols-1 gap-3 rounded-2xl bg-gray-50/70 p-4 sm:grid-cols-2 text-xs">
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <div className="flex items-center gap-1.5 font-semibold text-gray-900">
                         <User size={14} className="text-emerald-700" />
                         {order.customer_name || 'Customer'}
@@ -264,9 +289,30 @@ function VendorOrdersPage() {
                           </a>
                         </div>
                       )}
-                      <p className="text-gray-500 capitalize">
-                        Payment: {order.payment_method === 'card' ? 'Card' : 'Cash on Delivery'} ({order.payment_status})
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                        <span className="text-gray-600 capitalize">
+                          {order.payment_method?.replace(/_/g, ' ')}:
+                        </span>
+                        {order.payment_status === 'paid' ? (
+                          <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold flex items-center gap-1">
+                            <CheckCircle2 size={11} /> Paid
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-[10px] font-bold">
+                              Cash Pending
+                            </span>
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleConfirmPayment(order.order_id)}
+                              className="rounded-full bg-emerald-700 px-2.5 py-0.5 text-[10px] font-bold text-white hover:bg-emerald-800 transition"
+                            >
+                              Confirm Paid
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-1">
@@ -274,6 +320,9 @@ function VendorOrdersPage() {
                         <MapPin size={14} className="mt-0.5 shrink-0 text-emerald-700" />
                         <span>{order.delivery_address}</span>
                       </div>
+                      <p className="text-[11px] text-gray-400 capitalize">
+                        Fulfillment: {order.fulfillment_type || 'delivery'}
+                      </p>
                     </div>
                   </div>
 

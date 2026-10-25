@@ -16,12 +16,6 @@ const ROLE_COPY = {
   },
 };
 
-const HIGHLIGHTS = [
-  'Fresh produce from trusted vendors across Nsukka, delivered to your door.',
-  'Every vendor is verified before their storefront goes live, so you can order with confidence.',
-  'Pay by card or cash on delivery — whichever works for you.',
-];
-
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validate(role, formData, agree) {
@@ -118,9 +112,9 @@ function RegisterPage() {
   const copy = ROLE_COPY[role];
 
   return (
-    <AuthLayout highlights={HIGHLIGHTS}>
-      <h1 className="text-2xl font-semibold text-gray-900">Create your account</h1>
-      <p className="mt-2 text-sm text-gray-500">{copy.subheading}</p>
+    <AuthLayout>
+      <h1 className="text-2xl font-bold tracking-tight text-gray-900">Create your account</h1>
+      <p className="mt-1 text-xs text-gray-500">{copy.subheading}</p>
 
       <div className="mt-6 grid grid-cols-2 gap-1 rounded-full bg-gray-100 p-1">
         <button

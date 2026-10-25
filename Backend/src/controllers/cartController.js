@@ -18,7 +18,7 @@ const getCart = async (req, res) => {
 
 const addItem = async (req, res) => {
   try {
-    const { productId, quantity } = req.body;
+    const { productId, quantity, packagingUnit, unitPrice } = req.body;
     const qty = Number(quantity) || 1;
 
     if (!productId) return res.status(400).json({ message: 'productId is required.' });
@@ -32,7 +32,19 @@ const addItem = async (req, res) => {
       return res.status(400).json({ message: `Only ${product.stock_quantity} left in stock.` });
     }
 
-    const cart = await addItemToCart(req.user.userId, productId, qty);
+    let resolvedPrice = Number(product.price);
+    let resolvedUnit = packagingUnit || 'Single Unit';
+
+    if (unitPrice && !isNaN(Number(unitPrice))) {
+      resolvedPrice = Number(unitPrice);
+    } else if (packagingUnit && Array.isArray(product.packaging_options)) {
+      const match = product.packaging_options.find((p) => p.name === packagingUnit);
+      if (match && match.price) {
+        resolvedPrice = Number(match.price);
+      }
+    }
+
+    const cart = await addItemToCart(req.user.userId, productId, qty, resolvedUnit, resolvedPrice);
     return res.status(200).json(cart);
   } catch (err) {
     console.error('addItem error:', err);

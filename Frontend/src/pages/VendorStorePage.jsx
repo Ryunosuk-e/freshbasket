@@ -13,8 +13,10 @@ import {
   Store,
 } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader.jsx';
+import Footer from '../components/Footer.jsx';
 import { browseProducts, getVendorPublicProfile } from '../api/products.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { getProductImageUrl, handleImageFallback } from '../utils/productImages.js';
 
 function formatNaira(price) {
   const amount = Number(price);
@@ -143,7 +145,7 @@ function VendorStorePage() {
             ) : (
               <div className="mt-6 grid gap-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
                 {products.map((product) => {
-                  const primaryImage = product.images?.[0]?.imageUrl;
+                  const imgSrc = getProductImageUrl(product);
 
                   return (
                     <Link
@@ -151,23 +153,22 @@ function VendorStorePage() {
                       to={`/shop/${product.product_id}`}
                       className="group flex flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white p-4 transition hover:border-emerald-300 hover:shadow-md"
                     >
-                      <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-gray-50">
-                        {primaryImage ? (
-                          <img
-                            src={primaryImage}
-                            alt={product.name}
-                            className="h-full w-full object-cover transition group-hover:scale-105"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-gray-300">
-                            <Package size={32} />
-                          </div>
-                        )}
+                      <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-gray-100">
+                        <img
+                          src={imgSrc}
+                          alt={product.name}
+                          onError={(e) => handleImageFallback(e, product)}
+                          className="h-full w-full object-cover transition group-hover:scale-105"
+                        />
                         {product.stock_quantity <= 0 && (
                           <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
                             Out of Stock
                           </span>
                         )}
+                        <span className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-emerald-900 shadow-xs flex items-center gap-0.5">
+                          <MapPin size={9} className="text-emerald-700" />
+                          {vendor?.market_zone || 'Ogige'}
+                        </span>
                       </div>
 
                       <div className="mt-3 flex flex-1 flex-col justify-between">
@@ -199,6 +200,8 @@ function VendorStorePage() {
           </>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

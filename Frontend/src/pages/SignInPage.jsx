@@ -7,12 +7,6 @@ import { login as loginRequest } from '../api/auth.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getPostLoginPath } from '../utils/routing.js';
 
-const HIGHLIGHTS = [
-  'Fresh produce from trusted vendors across Nsukka, delivered to your door.',
-  'Every vendor is verified before their storefront goes live, so you can order with confidence.',
-  'Pay by card or cash on delivery — whichever works for you.',
-];
-
 function SignInPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,9 +20,7 @@ function SignInPage() {
   const [googleNotice, setGoogleNotice] = useState('');
   const [forgotNotice, setForgotNotice] = useState(false);
 
-  // Carried over from Register's redirect — e.g. "Account created." or the
-  // vendor "pending verification" message. Cleared automatically since it
-  // only ever comes from router state, never re-appears on refresh.
+  // Carried over from Register's redirect
   const infoMessage = location.state?.message;
 
   const handleSubmit = async (event) => {
@@ -52,9 +44,16 @@ function SignInPage() {
   };
 
   return (
-    <AuthLayout highlights={HIGHLIGHTS}>
-      <h1 className="text-2xl font-semibold text-gray-900">Sign In</h1>
-      <p className="mt-2 text-sm text-gray-500">Please fill your detail to access your account.</p>
+    <AuthLayout>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Welcome Back</h1>
+          <p className="mt-1 text-xs text-gray-500">Sign in to your FreshBasket account.</p>
+        </div>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+          Nsukka Campus
+        </span>
+      </div>
 
       {infoMessage && (
         <div role="status" className="mt-6 rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">

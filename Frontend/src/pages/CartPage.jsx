@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, Minus, Package, Plus, ShoppingCart, Trash2 } from 'lucide-react';
 import AppHeader from '../components/AppHeader.jsx';
+import Footer from '../components/Footer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { getCart, removeCartItem, updateCartItem } from '../api/cart.js';
+import { getProductImageUrl, handleImageFallback } from '../utils/productImages.js';
 
 function formatNaira(price) {
   const amount = Number(price);
@@ -80,24 +82,31 @@ function CartPage() {
             <ul className="mt-6 divide-y divide-gray-100">
               {items.map((item) => {
                 const isUnavailable = !item.is_active || item.verification_status !== 'verified';
+                const imgSrc = getProductImageUrl(item);
                 return (
                   <li key={item.cart_item_id} className="flex items-center gap-4 py-4">
-                    {item.image_url ? (
-                      <img src={item.image_url} alt="" className="h-16 w-16 rounded-xl object-cover" />
-                    ) : (
-                      <span className="flex h-16 w-16 items-center justify-center rounded-xl bg-gray-100 text-gray-400">
-                        <Package size={20} />
-                      </span>
-                    )}
+                    <img
+                      src={imgSrc}
+                      alt={item.name}
+                      onError={(e) => handleImageFallback(e, item)}
+                      className="h-16 w-16 rounded-2xl object-cover bg-gray-50 border border-gray-100 shrink-0"
+                    />
 
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.name}</p>
-                      <p className="text-sm text-gray-500">{item.shop_name}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 truncate">{item.name}</p>
+                      <div className="flex items-center gap-2 text-xs text-gray-500">
+                        <span>{item.shop_name}</span>
+                        {item.packaging_unit && (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                            {item.packaging_unit}
+                          </span>
+                        )}
+                      </div>
                       {isUnavailable && (
                         <p className="mt-0.5 text-xs font-medium text-red-600">No longer available — remove it to continue</p>
                       )}
-                      <p className="mt-1 text-sm font-semibold text-emerald-800">
-                        {formatNaira(item.price)} <span className="font-normal text-gray-400">/ {item.unit}</span>
+                      <p className="mt-1 text-sm font-extrabold text-emerald-800">
+                        {formatNaira(item.price)}
                       </p>
                     </div>
 
@@ -110,7 +119,7 @@ function CartPage() {
                       >
                         <Minus size={14} />
                       </button>
-                      <span className="w-6 text-center text-sm font-medium text-gray-900">{item.quantity}</span>
+                      <span className="w-6 text-center text-sm font-bold text-gray-900">{item.quantity}</span>
                       <button
                         type="button"
                         onClick={() => changeQuantity(item.product_id, item.quantity + 1)}
@@ -125,7 +134,7 @@ function CartPage() {
                       type="button"
                       onClick={() => changeQuantity(item.product_id, 0)}
                       disabled={updatingId === item.product_id}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 transition"
                       aria-label="Remove"
                     >
                       <Trash2 size={16} />
@@ -136,20 +145,22 @@ function CartPage() {
             </ul>
 
             <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-6">
-              <span className="text-gray-500">Subtotal</span>
-              <span className="text-xl font-semibold text-gray-900">{formatNaira(subtotal)}</span>
+              <span className="text-gray-500 font-medium">Subtotal</span>
+              <span className="text-xl font-extrabold text-gray-900">{formatNaira(subtotal)}</span>
             </div>
 
             <button
               type="button"
               onClick={() => navigate('/checkout')}
-              className="mt-4 w-full rounded-full bg-emerald-800 py-3 text-sm font-medium text-white transition hover:bg-emerald-700"
+              className="mt-4 w-full rounded-full bg-emerald-800 py-3.5 text-sm font-bold text-white shadow-xs transition hover:bg-emerald-700"
             >
               Proceed to Checkout
             </button>
           </>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

@@ -9,9 +9,9 @@ const getOrCreateCart = async (customerId) => {
 };
 
 const CART_ITEMS_SELECT = `
-  SELECT ci.cart_item_id, ci.product_id, ci.quantity, ci.added_at,
-         p.name, p.price, p.unit, p.stock_quantity, p.is_active,
-         v.vendor_id, v.shop_name, v.verification_status,
+  SELECT ci.cart_item_id, ci.product_id, ci.quantity, ci.packaging_unit, ci.unit_price, ci.added_at,
+         p.name, COALESCE(ci.unit_price, p.price) AS price, p.unit, p.stock_quantity, p.is_active,
+         v.vendor_id, v.shop_name, COALESCE(v.market_zone, 'Ogige Market') AS market_zone, v.verification_status,
          (
            SELECT pi.image_url FROM product_images pi
            WHERE pi.product_id = p.product_id
@@ -35,7 +35,7 @@ const getCartWithItems = async (customerId) => {
 // active, vendor verified, enough stock for the requested quantity.
 const findPurchasableProduct = async (productId) => {
   const result = await pool.query(
-    `SELECT p.product_id, p.stock_quantity, p.is_active, v.verification_status
+    `SELECT p.product_id, p.stock_quantity, p.is_active, p.price, p.packaging_options, v.verification_status
      FROM products p
      JOIN vendors v ON v.vendor_id = p.vendor_id
      WHERE p.product_id = $1`,
@@ -44,14 +44,24 @@ const findPurchasableProduct = async (productId) => {
   return result.rows[0];
 };
 
-const addItemToCart = async (customerId, productId, quantity) => {
+const addItemToCart = async (customerId, productId, quantity, packagingUnit = 'Single Unit', unitPrice = null) => {
   const cartId = await getOrCreateCart(customerId);
-  await pool.query(
-    `INSERT INTO cart_items (cart_id, product_id, quantity)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (cart_id, product_id) DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity`,
-    [cartId, productId, quantity]
+  const existing = await pool.query(
+    `SELECT cart_item_id, quantity FROM cart_items WHERE cart_id = $1 AND product_id = $2 AND packaging_unit = $3`,
+    [cartId, productId, packagingUnit]
   );
+  if (existing.rows[0]) {
+    await pool.query(
+      `UPDATE cart_items SET quantity = quantity + $1 WHERE cart_item_id = $2`,
+      [quantity, existing.rows[0].cart_item_id]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO cart_items (cart_id, product_id, quantity, packaging_unit, unit_price)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [cartId, productId, quantity, packagingUnit, unitPrice]
+    );
+  }
   return getCartWithItems(customerId);
 };
 

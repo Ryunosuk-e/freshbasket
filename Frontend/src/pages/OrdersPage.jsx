@@ -125,7 +125,9 @@ function OrdersPage() {
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-gray-900">Order #{order.order_id}</span>
+                        <span className="font-semibold text-gray-900">
+                          Order {order.order_code || `#${order.order_id}`}
+                        </span>
                         <span
                           className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize ${statusConfig.style}`}
                         >

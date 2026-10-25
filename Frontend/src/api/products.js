@@ -59,6 +59,32 @@ export function getProduct(productId) {
   return fetch(`${API_BASE_URL}/api/products/${productId}`).then(parseResponse);
 }
 
+export function getProductRecommendations(productId) {
+  return fetch(`${API_BASE_URL}/api/products/${productId}/recommendations`).then(parseResponse);
+}
+
+export function getAdminAllProducts(token) {
+  return fetch(`${API_BASE_URL}/api/products/admin/all`, {
+    headers: authHeaders(token),
+  }).then(parseResponse);
+}
+
+export function approveProduct(token, productId) {
+  return fetch(`${API_BASE_URL}/api/products/admin/${productId}/approve`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  }).then(parseResponse);
+}
+
+export function rejectProduct(token, productId) {
+  return fetch(`${API_BASE_URL}/api/products/admin/${productId}/reject`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  }).then(parseResponse);
+}
+
+export const getProducts = browseProducts;
+
 export function getVendorPublicProfile(vendorId, token) {
   const headers = token ? authHeaders(token) : {};
   return fetch(`${API_BASE_URL}/api/vendors/${vendorId}`, { headers }).then(parseResponse);

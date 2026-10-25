@@ -1,7 +1,9 @@
 import { API_BASE_URL, authHeaders, parseResponse } from './client.js';
 
-export function getCheckoutSummary(token) {
-  return fetch(`${API_BASE_URL}/api/orders/checkout-summary`, { headers: authHeaders(token) }).then(parseResponse);
+export function getCheckoutSummary(token, fulfillmentType = 'delivery') {
+  return fetch(`${API_BASE_URL}/api/orders/checkout-summary?fulfillmentType=${fulfillmentType}`, {
+    headers: authHeaders(token),
+  }).then(parseResponse);
 }
 
 export function placeOrder(token, payload) {
@@ -29,6 +31,33 @@ export function updateOrderStatus(token, orderId, status) {
     method: 'PATCH',
     headers: authHeaders(token),
     body: JSON.stringify({ status }),
+  }).then(parseResponse);
+}
+
+export function confirmOrderPayment(token, orderId) {
+  return fetch(`${API_BASE_URL}/api/orders/${orderId}/confirm-payment`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+  }).then(parseResponse);
+}
+
+export function submitOrderDispute(token, orderId, reason) {
+  return fetch(`${API_BASE_URL}/api/disputes/order/${orderId}`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ reason }),
+  }).then(parseResponse);
+}
+
+export function getAllDisputes(token) {
+  return fetch(`${API_BASE_URL}/api/disputes`, { headers: authHeaders(token) }).then(parseResponse);
+}
+
+export function resolveDispute(token, disputeId, status, resolution) {
+  return fetch(`${API_BASE_URL}/api/disputes/${disputeId}/resolve`, {
+    method: 'PATCH',
+    headers: authHeaders(token),
+    body: JSON.stringify({ status, resolution }),
   }).then(parseResponse);
 }
 

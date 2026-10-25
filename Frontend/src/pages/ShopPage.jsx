@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownUp, Filter, Loader2, Package, Search, Star, Store, X } from 'lucide-react';
+import { ArrowDownUp, Filter, Loader2, MapPin, Package, Search, Star, Store, X } from 'lucide-react';
 import PublicHeader from '../components/PublicHeader.jsx';
+import Footer from '../components/Footer.jsx';
 import { browseProducts, getCategories } from '../api/products.js';
+import { getProductImageUrl, handleImageFallback } from '../utils/productImages.js';
 
 function formatNaira(price) {
   const amount = Number(price);
@@ -12,6 +14,7 @@ function formatNaira(price) {
 function ShopPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const category = searchParams.get('category') || '';
+  const locationParam = searchParams.get('location') || '';
   const q = searchParams.get('q') || '';
   const sort = searchParams.get('sort') || 'newest';
   const minPriceParam = searchParams.get('minPrice') || '';
@@ -47,6 +50,7 @@ function ShopPage() {
     browseProducts({
       q,
       category,
+      location: locationParam,
       sort,
       minPrice: minPriceParam,
       maxPrice: maxPriceParam,
@@ -58,7 +62,7 @@ function ShopPage() {
       })
       .catch((err) => setLoadError(err.message || 'Could not load products.'))
       .finally(() => setIsLoading(false));
-  }, [q, category, sort, minPriceParam, maxPriceParam]);
+  }, [q, category, locationParam, sort, minPriceParam, maxPriceParam]);
 
   const handleSearchSubmit = (event) => {
     event.preventDefault();
@@ -77,6 +81,16 @@ function ShopPage() {
       next.delete('category');
     } else {
       next.set('category', slug);
+    }
+    setSearchParams(next);
+  };
+
+  const handleLocationClick = (loc) => {
+    const next = new URLSearchParams(searchParams);
+    if (!loc || loc === locationParam) {
+      next.delete('location');
+    } else {
+      next.set('location', loc);
     }
     setSearchParams(next);
   };
@@ -116,6 +130,7 @@ function ShopPage() {
     browseProducts({
       q,
       category,
+      location: locationParam,
       sort,
       minPrice: minPriceParam,
       maxPrice: maxPriceParam,
@@ -129,7 +144,7 @@ function ShopPage() {
       .finally(() => setIsLoadingMore(false));
   };
 
-  const hasActiveFilters = Boolean(q || category || minPriceParam || maxPriceParam || sort !== 'newest');
+  const hasActiveFilters = Boolean(q || category || locationParam || minPriceParam || maxPriceParam || sort !== 'newest');
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -268,6 +283,28 @@ function ShopPage() {
           </div>
         )}
 
+        {/* Location Filter Row (Nsukka Campus & Market Zones) */}
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500 mr-1 flex items-center gap-1">
+            <MapPin size={12} className="text-emerald-700" />
+            Location:
+          </span>
+          {['', 'Ogige Market', 'Hilltop', 'Behind Flat'].map((loc) => (
+            <button
+              key={loc}
+              type="button"
+              onClick={() => handleLocationClick(loc)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                locationParam === loc
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {loc ? loc : 'All Nsukka'}
+            </button>
+          ))}
+        </div>
+
         {/* Results Area */}
         <div className="mt-8">
           {isLoading ? (
@@ -313,8 +350,7 @@ function ShopPage() {
               {/* Products Grid */}
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {products.map((product) => {
-                  const primaryImage =
-                    product.images?.find((img) => img.isPrimary)?.imageUrl || product.images?.[0]?.imageUrl;
+                  const imgSrc = getProductImageUrl(product);
 
                   return (
                     <div
@@ -322,20 +358,22 @@ function ShopPage() {
                       className="group flex flex-col justify-between overflow-hidden rounded-3xl border border-gray-200 bg-white p-3.5 transition hover:border-emerald-300 hover:shadow-md"
                     >
                       <Link to={`/shop/${product.product_id}`}>
-                        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-gray-50">
-                          {primaryImage ? (
-                            <img
-                              src={primaryImage}
-                              alt={product.name}
-                              className="h-full w-full object-cover transition group-hover:scale-105"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-gray-300">
-                              <Package size={32} />
-                            </div>
-                          )}
+                        <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-gray-100">
+                          <img
+                            src={imgSrc}
+                            alt={product.name}
+                            onError={(e) => handleImageFallback(e, product)}
+                            className="h-full w-full object-cover transition group-hover:scale-105"
+                          />
+
+                          {/* Location Badge */}
+                          <span className="absolute top-2 left-2 rounded-full bg-white/95 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-emerald-950 shadow-xs flex items-center gap-0.5">
+                            <MapPin size={9} className="text-emerald-700" />
+                            {product.market_zone || 'Ogige Market'}
+                          </span>
+
                           {product.stock_quantity <= 0 && (
-                            <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
+                            <span className="absolute right-2 bottom-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
                               Out of Stock
                             </span>
                           )}
@@ -406,6 +444,8 @@ function ShopPage() {
           )}
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

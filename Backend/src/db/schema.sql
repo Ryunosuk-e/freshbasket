@@ -137,14 +137,19 @@ CREATE INDEX IF NOT EXISTS idx_cart_items_cart_id ON cart_items(cart_id);
 -- actually charged, not the current price.
 CREATE TABLE IF NOT EXISTS orders (
     order_id           SERIAL PRIMARY KEY,
+    order_code         VARCHAR(20) UNIQUE,
     customer_id        INTEGER NOT NULL REFERENCES customers(customer_id),
     delivery_address   VARCHAR(255) NOT NULL,
-    payment_method     VARCHAR(20) NOT NULL CHECK (payment_method IN ('card', 'cash_on_delivery')),
-    payment_status     VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'failed')),
+    fulfillment_type   VARCHAR(20) NOT NULL DEFAULT 'delivery',
+    payment_method     VARCHAR(30) NOT NULL DEFAULT 'card',
+    payment_status     VARCHAR(20) NOT NULL DEFAULT 'pending',
     payment_reference  VARCHAR(100),
-    order_status       VARCHAR(20) NOT NULL DEFAULT 'placed' CHECK (order_status IN ('placed', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled')),
+    order_status       VARCHAR(20) NOT NULL DEFAULT 'placed',
     total_amount       NUMERIC(10,2) NOT NULL,
-    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    delivery_fee       NUMERIC(10,2) NOT NULL DEFAULT 500.00,
+    requires_delivery  BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 DO $$ BEGIN
@@ -155,10 +160,55 @@ EXCEPTION
     WHEN others THEN NULL;
 END $$;
 
+DO $$ BEGIN
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+    ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check
+        CHECK (payment_method IN ('card', 'bank_transfer', 'cash_on_delivery', 'cash'));
+EXCEPTION
+    WHEN others THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_status_check;
+    ALTER TABLE orders ADD CONSTRAINT orders_payment_status_check
+        CHECK (payment_status IN ('pending', 'paid', 'failed', 'refunded'));
+EXCEPTION
+    WHEN others THEN NULL;
+END $$;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_code VARCHAR(20);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS fulfillment_type VARCHAR(20) NOT NULL DEFAULT 'delivery';
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(10,2) NOT NULL DEFAULT 500.00;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requires_delivery BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_order_code ON orders(order_code) WHERE order_code IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_payment_reference ON orders(payment_reference) WHERE payment_reference IS NOT NULL;
+
+-- Product approval & packaging tier extensions
+ALTER TABLE products ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'approved';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_options JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE vendors ADD COLUMN IF NOT EXISTS market_zone VARCHAR(80) DEFAULT 'Ogige Market';
+
+-- Order item packaging unit
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS packaging_unit VARCHAR(80) DEFAULT 'Single Unit';
+ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS packaging_unit VARCHAR(80) DEFAULT 'Single Unit';
+ALTER TABLE cart_items ADD COLUMN IF NOT EXISTS unit_price NUMERIC(10,2);
+ALTER TABLE cart_items DROP CONSTRAINT IF EXISTS cart_items_cart_id_product_id_key;
+
+-- Dispute Resolution System (Academic & NDPA Compliance)
+CREATE TABLE IF NOT EXISTS order_disputes (
+    dispute_id     SERIAL PRIMARY KEY,
+    order_id       INTEGER NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+    customer_id    INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
+    reason         TEXT NOT NULL,
+    status         VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'dismissed')),
+    resolution     TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_disputes_order_id ON order_disputes(order_id);
+CREATE INDEX IF NOT EXISTS idx_disputes_status ON order_disputes(status);
 
 CREATE TABLE IF NOT EXISTS order_items (
     order_item_id  SERIAL PRIMARY KEY,
