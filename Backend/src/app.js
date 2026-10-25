@@ -22,7 +22,10 @@ const app = express();
 // Logs every request to the terminal, e.g. "POST /api/auth/register/customer
 // 201 42.318 ms" — this is what lets you watch requests arrive in real time.
 app.use(morgan('dev'));
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+}));
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
