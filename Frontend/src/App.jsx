@@ -10,11 +10,13 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
 import VendorProductsPage from './pages/VendorProductsPage.jsx';
 import VendorOrdersPage from './pages/VendorOrdersPage.jsx';
+import AgentDeliveriesPage from './pages/AgentDeliveriesPage.jsx';
 import CartPage from './pages/CartPage.jsx';
 import CheckoutPage from './pages/CheckoutPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import OrderDetailPage from './pages/OrderDetailPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
+import NotFoundPage from './pages/NotFoundPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
 function App() {
@@ -67,6 +69,14 @@ function App() {
         }
       />
       <Route
+        path="/agent/deliveries"
+        element={
+          <ProtectedRoute allowedRoles={['agent']}>
+            <AgentDeliveriesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/cart"
         element={
           <ProtectedRoute allowedRoles={['customer']}>
@@ -101,12 +111,12 @@ function App() {
       <Route
         path="/profile"
         element={
-          <ProtectedRoute allowedRoles={['customer', 'vendor', 'admin']}>
+          <ProtectedRoute allowedRoles={['customer', 'vendor', 'admin', 'agent']}>
             <ProfilePage />
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

@@ -3,10 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FreshBasket — Create your account</title>
+    <meta name="theme-color" content="#065f46" />
+    <meta name="description" content="Localized fresh food and produce marketplace for UNN Nsukka campus and environs." />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>FreshBasket — Nsukka Campus Marketplace</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.info('PWA Service Worker offline shell registration:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>

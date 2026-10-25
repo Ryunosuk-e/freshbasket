@@ -16,7 +16,7 @@ function ProtectedRoute({ children, allowedRoles, requireIncompleteProfile = fal
     return <Navigate to="/sign-in" replace />;
   }
 
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'agent') {
     if (requireIncompleteProfile && user.profile_completed) {
       return <Navigate to="/dashboard" replace />;
     }

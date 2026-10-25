@@ -6,7 +6,15 @@ const { getCartWithItems } = require('./cartModel');
 // pay for less than what's actually in their cart.
 const computeCartTotal = (items) => items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
 
-const createOrderFromCart = async ({ customerId, deliveryAddress, paymentMethod, paymentStatus, paymentReference }) => {
+const DELIVERY_FEE = 500.0; // Local Nsukka delivery flat rate
+
+const createOrderFromCart = async ({
+  customerId,
+  deliveryAddress,
+  paymentMethod,
+  paymentStatus,
+  paymentReference,
+}) => {
   const { cartId, items } = await getCartWithItems(customerId);
   const purchasable = items.filter((item) => item.is_active && item.verification_status === 'verified');
 
@@ -14,21 +22,39 @@ const createOrderFromCart = async ({ customerId, deliveryAddress, paymentMethod,
     throw new Error('Your cart has no items available to order.');
   }
 
-  const total = computeCartTotal(purchasable);
+  const itemsTotal = computeCartTotal(purchasable);
+  const totalWithDelivery = itemsTotal + DELIVERY_FEE;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
+    // 1. Create order record
     const orderResult = await client.query(
-      `INSERT INTO orders (customer_id, delivery_address, payment_method, payment_status, payment_reference, total_amount)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO orders (customer_id, delivery_address, payment_method, payment_status, payment_reference, delivery_fee, requires_delivery, total_amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING order_id, created_at`,
-      [customerId, deliveryAddress, paymentMethod, paymentStatus, paymentReference, total]
+      [customerId, deliveryAddress, paymentMethod, paymentStatus, paymentReference, DELIVERY_FEE, true, totalWithDelivery]
     );
     const orderId = orderResult.rows[0].order_id;
 
+    // 2. Insert items AND atomically deduct stock (NFR05 - ACID transaction consistency)
+    const vendorIds = new Set();
     for (const item of purchasable) {
+      const stockUpdate = await client.query(
+        `UPDATE products
+         SET stock_quantity = stock_quantity - $1
+         WHERE product_id = $2 AND stock_quantity >= $1
+         RETURNING stock_quantity`,
+        [item.quantity, item.product_id]
+      );
+
+      if (stockUpdate.rowCount === 0) {
+        throw new Error(`Insufficient stock for "${item.name}". Only a limited quantity is available.`);
+      }
+
+      vendorIds.add(item.vendor_id);
+
       await client.query(
         `INSERT INTO order_items (order_id, product_id, vendor_id, product_name, unit_price, quantity, line_total)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -36,12 +62,48 @@ const createOrderFromCart = async ({ customerId, deliveryAddress, paymentMethod,
       );
     }
 
-    // The cart's contents have become an order — empty it so the next
-    // visit to /cart starts fresh.
+    // 3. Clear cart
     await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
 
+    // 4. Delivery Agent Assignment (FR09 / UC11)
+    // Find an available delivery agent
+    const agentRes = await client.query(
+      `SELECT agent_id FROM delivery_agents WHERE current_status = 'available' LIMIT 1`
+    );
+    const assignedAgentId = agentRes.rows[0]?.agent_id || null;
+
+    await client.query(
+      `INSERT INTO delivery_assignments (order_id, agent_id, delivery_address, status)
+       VALUES ($1, $2, $3, $4)`,
+      [orderId, assignedAgentId, deliveryAddress, assignedAgentId ? 'assigned' : 'assigned']
+    );
+
+    if (assignedAgentId) {
+      await client.query(
+        `UPDATE delivery_agents SET current_status = 'busy', assigned_order_id = $1 WHERE agent_id = $2`,
+        [orderId, assignedAgentId]
+      );
+    }
+
+    // 5. In-App Notifications (FR12)
+    // Customer notification
+    await client.query(
+      `INSERT INTO notifications (recipient_id, channel, type, message)
+       VALUES ($1, 'in_app', 'order_placed', $2)`,
+      [customerId, `Order #${orderId} has been placed successfully. Total: ₦${totalWithDelivery.toLocaleString()}`]
+    );
+
+    // Vendor notification(s)
+    for (const vId of vendorIds) {
+      await client.query(
+        `INSERT INTO notifications (recipient_id, channel, type, message)
+         VALUES ($1, 'in_app', 'new_order', $2)`,
+        [vId, `New order #${orderId} received for your store items.`]
+      );
+    }
+
     await client.query('COMMIT');
-    return { orderId, total };
+    return { orderId, total: totalWithDelivery, itemsTotal, deliveryFee: DELIVERY_FEE };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -52,9 +114,9 @@ const createOrderFromCart = async ({ customerId, deliveryAddress, paymentMethod,
 
 const findOrderById = async (orderId, customerId = null) => {
   const query = customerId
-    ? `SELECT order_id, customer_id, delivery_address, payment_method, payment_status, order_status, total_amount, created_at
+    ? `SELECT order_id, customer_id, delivery_address, payment_method, payment_status, order_status, delivery_fee, total_amount, created_at
        FROM orders WHERE order_id = $1 AND customer_id = $2`
-    : `SELECT order_id, customer_id, delivery_address, payment_method, payment_status, order_status, total_amount, created_at
+    : `SELECT order_id, customer_id, delivery_address, payment_method, payment_status, order_status, delivery_fee, total_amount, created_at
        FROM orders WHERE order_id = $1`;
   const params = customerId ? [orderId, customerId] : [orderId];
 
@@ -62,6 +124,7 @@ const findOrderById = async (orderId, customerId = null) => {
   const order = orderResult.rows[0];
   if (!order) return null;
 
+  // Joined items
   const itemsResult = await pool.query(
     `SELECT oi.product_id, oi.vendor_id, v.shop_name, oi.product_name, oi.unit_price, oi.quantity, oi.line_total,
             p.unit
@@ -71,12 +134,30 @@ const findOrderById = async (orderId, customerId = null) => {
      WHERE oi.order_id = $1`,
     [orderId]
   );
-  return { ...order, items: itemsResult.rows };
+
+  // Delivery assignment & agent details (FR09)
+  const deliveryResult = await pool.query(
+    `SELECT da.assignment_id, da.status AS delivery_status, da.assigned_at, da.delivered_at,
+            u.full_name AS agent_name, u.phone_number AS agent_phone,
+            dag.vehicle_type
+     FROM delivery_assignments da
+     LEFT JOIN delivery_agents dag ON dag.agent_id = da.agent_id
+     LEFT JOIN users u ON u.user_id = da.agent_id
+     WHERE da.order_id = $1
+     ORDER BY da.assignment_id DESC LIMIT 1`,
+    [orderId]
+  );
+
+  return {
+    ...order,
+    items: itemsResult.rows,
+    delivery: deliveryResult.rows[0] || null,
+  };
 };
 
 const listOrdersByCustomer = async (customerId) => {
   const result = await pool.query(
-    `SELECT o.order_id, o.payment_method, o.payment_status, o.order_status, o.total_amount, o.created_at,
+    `SELECT o.order_id, o.payment_method, o.payment_status, o.order_status, o.total_amount, o.delivery_fee, o.created_at,
             COUNT(oi.order_item_id)::int AS item_count
      FROM orders o
      LEFT JOIN order_items oi ON oi.order_id = o.order_id
@@ -91,7 +172,7 @@ const listOrdersByCustomer = async (customerId) => {
 const listOrdersByVendor = async (vendorId) => {
   const ordersResult = await pool.query(
     `SELECT DISTINCT o.order_id, o.delivery_address, o.payment_method, o.payment_status,
-            o.order_status, o.created_at,
+            o.order_status, o.total_amount, o.created_at,
             u.full_name AS customer_name, u.phone_number AS customer_phone, u.email AS customer_email
      FROM orders o
      JOIN order_items oi ON oi.order_id = o.order_id
@@ -148,16 +229,27 @@ const updateOrderStatus = async (orderId, newStatus, vendorId = null) => {
   }
 
   const result = await pool.query(
-    `UPDATE orders SET order_status = $2 WHERE order_id = $1 RETURNING *`,
+    `UPDATE orders SET order_status = $2, updated_at = NOW() WHERE order_id = $1 RETURNING *`,
     [orderId, newStatus]
   );
-  return result.rows[0];
+  const order = result.rows[0];
+
+  // Dispatch notification to customer (FR12)
+  if (order) {
+    await pool.query(
+      `INSERT INTO notifications (recipient_id, channel, type, message)
+       VALUES ($1, 'in_app', 'order_status_update', $2)`,
+      [order.customer_id, `Your order #${orderId} status has been updated to "${newStatus.replace('_', ' ')}".`]
+    );
+  }
+
+  return order;
 };
 
 const listAllOrdersForAdmin = async () => {
   const result = await pool.query(
     `SELECT o.order_id, o.customer_id, o.delivery_address, o.payment_method, o.payment_status,
-            o.order_status, o.total_amount, o.created_at,
+            o.order_status, o.total_amount, o.delivery_fee, o.created_at,
             u.full_name AS customer_name, u.phone_number AS customer_phone, u.email AS customer_email,
             COUNT(oi.order_item_id)::int AS item_count
      FROM orders o
@@ -177,4 +269,5 @@ module.exports = {
   updateOrderStatus,
   listAllOrdersForAdmin,
   computeCartTotal,
+  DELIVERY_FEE,
 };

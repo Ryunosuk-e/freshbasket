@@ -4,11 +4,13 @@ import {
   LogOut,
   Package,
   ShoppingCart,
+  Truck,
   User,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
+import NotificationBell from './NotificationBell.jsx';
 
 function AppHeader({ tag }) {
   const { user, logout } = useAuth();
@@ -24,6 +26,7 @@ function AppHeader({ tag }) {
   const isCustomer = user?.role === 'customer';
   const isVendor = user?.role === 'vendor';
   const isAdmin = user?.role === 'admin';
+  const isAgent = user?.role === 'agent';
 
   const isActive = (path) => location.pathname === path;
 
@@ -121,6 +124,18 @@ function AppHeader({ tag }) {
             </>
           )}
 
+          {isAgent && (
+            <Link
+              to="/agent/deliveries"
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 transition ${
+                isActive('/agent/deliveries') ? 'bg-emerald-50 font-semibold text-emerald-800' : 'hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Truck size={15} />
+              <span>Deliveries</span>
+            </Link>
+          )}
+
           {isAdmin && (
             <Link
               to="/admin"
@@ -145,6 +160,8 @@ function AppHeader({ tag }) {
 
         {/* Right side controls */}
         <div className="flex items-center gap-2 sm:gap-3">
+          <NotificationBell />
+
           <Link
             to="/profile"
             className="hidden md:flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50/80 px-3 py-1 text-xs hover:border-emerald-300 hover:bg-emerald-50/40 transition"

@@ -186,13 +186,44 @@ function OrderDetailPage() {
                 )}
               </div>
 
-              {/* Delivery Address */}
-              <div className="flex items-start gap-3 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
-                <MapPin size={18} className="mt-0.5 shrink-0 text-emerald-700" />
-                <div>
-                  <p className="font-semibold text-gray-900">Delivery Address</p>
-                  <p className="mt-0.5 text-gray-600">{order.delivery_address}</p>
+              {/* Delivery Rider & Destination */}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="flex items-start gap-3 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
+                  <MapPin size={18} className="mt-0.5 shrink-0 text-emerald-700" />
+                  <div>
+                    <p className="font-semibold text-gray-900">Delivery Address</p>
+                    <p className="mt-0.5 text-xs text-gray-600">{order.delivery_address}</p>
+                  </div>
                 </div>
+
+                {order.delivery?.agent_name ? (
+                  <div className="flex items-start gap-3 rounded-2xl bg-purple-50/70 border border-purple-100 p-4 text-sm text-gray-700">
+                    <Truck size={18} className="mt-0.5 shrink-0 text-purple-700" />
+                    <div>
+                      <p className="font-semibold text-gray-900">Assigned Delivery Courier</p>
+                      <p className="text-xs text-purple-900 font-bold">{order.delivery.agent_name}</p>
+                      <p className="text-[11px] text-gray-500">{order.delivery.vehicle_type || 'Motorcycle'}</p>
+                      {order.delivery.agent_phone && (
+                        <a
+                          href={`tel:${order.delivery.agent_phone}`}
+                          className="mt-1 inline-block text-xs font-bold text-emerald-800 underline"
+                        >
+                          Call Rider: {order.delivery.agent_phone}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 rounded-2xl bg-gray-50 p-4 text-sm text-gray-700">
+                    <Truck size={18} className="mt-0.5 shrink-0 text-gray-400" />
+                    <div>
+                      <p className="font-semibold text-gray-900">Courier Dispatch</p>
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        A local Nsukka rider is being assigned to pick up your grocery package.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -220,8 +251,16 @@ function OrderDetailPage() {
                 ))}
               </ul>
 
-              <div className="mt-6 border-t border-gray-100 pt-5">
-                <div className="flex items-center justify-between text-base font-bold text-gray-900">
+              <div className="mt-6 border-t border-gray-100 pt-5 space-y-2">
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Items Subtotal</span>
+                  <span>{formatNaira(order.total_amount - (order.delivery_fee || 500))}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Nsukka Local Delivery Fee</span>
+                  <span>{formatNaira(order.delivery_fee || 500)}</span>
+                </div>
+                <div className="flex items-center justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-50">
                   <span>Total Amount</span>
                   <span className="text-xl text-emerald-800">{formatNaira(order.total_amount)}</span>
                 </div>

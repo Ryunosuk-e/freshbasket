@@ -186,11 +186,21 @@ function CheckoutPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between border-t border-gray-100 pt-6">
-              <span className="text-gray-500">
-                {summary.itemCount} item{summary.itemCount === 1 ? '' : 's'}
-              </span>
-              <span className="text-xl font-semibold text-gray-900">{formatNaira(summary.total)}</span>
+            <div className="border-t border-gray-100 pt-5 space-y-2">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Items Subtotal ({summary.itemCount} {summary.itemCount === 1 ? 'item' : 'items'})</span>
+                <span className="font-medium text-gray-700">
+                  {formatNaira(summary.itemsTotal !== undefined ? summary.itemsTotal : Math.max(0, summary.total - 500))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Nsukka Local Delivery Fee</span>
+                <span className="font-medium text-gray-700">{formatNaira(summary.deliveryFee || 500)}</span>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-gray-50">
+                <span className="font-bold text-gray-900">Total Payable</span>
+                <span className="text-xl font-extrabold text-emerald-800">{formatNaira(summary.total)}</span>
+              </div>
             </div>
 
             <button

@@ -190,3 +190,45 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_customer_id ON reviews(customer_id);
+
+
+-- ---------------------------------------------------------------------
+-- Sprint 5: Delivery Coordination & Agents (FR09 / UC11)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS delivery_agents (
+    agent_id          INTEGER PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+    current_status    VARCHAR(20) NOT NULL DEFAULT 'available' CHECK (current_status IN ('available', 'busy', 'offline')),
+    vehicle_type      VARCHAR(50) NOT NULL DEFAULT 'Motorcycle',
+    assigned_order_id INTEGER REFERENCES orders(order_id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS delivery_assignments (
+    assignment_id     SERIAL PRIMARY KEY,
+    order_id          INTEGER NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,
+    agent_id          INTEGER REFERENCES delivery_agents(agent_id) ON DELETE SET NULL,
+    pickup_address    VARCHAR(255),
+    delivery_address  VARCHAR(255) NOT NULL,
+    status            VARCHAR(30) NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned', 'picked_up', 'delivered', 'failed')),
+    assigned_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    delivered_at      TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_delivery_assignments_order_id ON delivery_assignments(order_id);
+CREATE INDEX IF NOT EXISTS idx_delivery_assignments_agent_id ON delivery_assignments(agent_id);
+
+-- ---------------------------------------------------------------------
+-- Notifications Subsystem (FR12)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_id   SERIAL PRIMARY KEY,
+    recipient_id      INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    channel           VARCHAR(20) NOT NULL DEFAULT 'in_app' CHECK (channel IN ('push', 'sms', 'in_app')),
+    type              VARCHAR(50) NOT NULL,
+    message           TEXT NOT NULL,
+    is_read           BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient_id ON notifications(recipient_id);

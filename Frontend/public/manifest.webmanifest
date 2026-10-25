@@ -1,0 +1,18 @@
+{
+  "name": "FreshBasket Nsukka Marketplace",
+  "short_name": "FreshBasket",
+  "description": "Localized online marketplace connecting UNN students, staff, and Nsukka residents with local food vendors.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#065f46",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

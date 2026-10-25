@@ -1,3 +1,4 @@
+const pool = require('../config/db');
 const {
   createOrderFromCart,
   findOrderById,
@@ -6,6 +7,7 @@ const {
   updateOrderStatus,
   listAllOrdersForAdmin,
   computeCartTotal,
+  DELIVERY_FEE,
 } = require('../models/orderModel');
 const { getCartWithItems } = require('../models/cartModel');
 const { isPaystackConfigured, verifyPaystackTransaction } = require('../utils/paystack');
@@ -19,9 +21,13 @@ const getCheckoutSummary = async (req, res) => {
   try {
     const { items } = await getCartWithItems(req.user.userId);
     const purchasable = items.filter((item) => item.is_active && item.verification_status === 'verified');
-    const total = computeCartTotal(purchasable);
+    const itemsTotal = computeCartTotal(purchasable);
+    const finalTotal = itemsTotal > 0 ? itemsTotal + DELIVERY_FEE : 0;
+
     return res.status(200).json({
-      total,
+      itemsTotal,
+      deliveryFee: DELIVERY_FEE,
+      total: finalTotal,
       itemCount: purchasable.reduce((sum, item) => sum + item.quantity, 0),
       paystackConfigured: isPaystackConfigured(),
     });
@@ -48,6 +54,13 @@ const placeOrder = async (req, res) => {
       if (!paystackReference) {
         return res.status(400).json({ message: 'paystackReference is required for card payments.' });
       }
+
+      // Prevent Paystack reference reuse vulnerability
+      const existingRef = await pool.query('SELECT order_id FROM orders WHERE payment_reference = $1', [paystackReference]);
+      if (existingRef.rows.length > 0) {
+        return res.status(409).json({ message: 'This payment transaction reference has already been used.' });
+      }
+
       if (!isPaystackConfigured()) {
         return res.status(503).json({ message: 'Card payments are not configured on this server yet.' });
       }
@@ -61,16 +74,16 @@ const placeOrder = async (req, res) => {
 
       const { items } = await getCartWithItems(req.user.userId);
       const purchasable = items.filter((item) => item.is_active && item.verification_status === 'verified');
-      const expectedTotal = computeCartTotal(purchasable);
+      const expectedTotal = computeCartTotal(purchasable) + DELIVERY_FEE;
       const amountPaid = verified.amount / 100; // Paystack reports kobo
-      if (Math.abs(amountPaid - expectedTotal) > 0.01) {
-        return res.status(402).json({ message: 'Paid amount does not match your cart total.' });
+      if (Math.abs(amountPaid - expectedTotal) > 0.01 && Math.abs(amountPaid - computeCartTotal(purchasable)) > 0.01) {
+        return res.status(402).json({ message: 'Paid amount does not match your checkout total.' });
       }
 
       paymentStatus = 'paid';
     }
 
-    const { orderId, total } = await createOrderFromCart({
+    const { orderId, total, itemsTotal, deliveryFee } = await createOrderFromCart({
       customerId: req.user.userId,
       deliveryAddress,
       paymentMethod,
@@ -78,7 +91,14 @@ const placeOrder = async (req, res) => {
       paymentReference: paymentMethod === 'card' ? paystackReference : null,
     });
 
-    return res.status(201).json({ message: 'Order placed.', orderId, total, paymentStatus });
+    return res.status(201).json({
+      message: 'Order placed successfully.',
+      orderId,
+      total,
+      itemsTotal,
+      deliveryFee,
+      paymentStatus,
+    });
   } catch (err) {
     console.error('placeOrder error:', err);
     return res.status(500).json({ message: err.message || 'Could not place your order.' });

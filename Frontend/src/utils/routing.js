@@ -4,6 +4,7 @@
 export function getPostLoginPath(user) {
   if (!user) return '/sign-in';
   if (user.role === 'admin') return '/admin';
+  if (user.role === 'agent') return '/agent/deliveries';
   if (!user.profile_completed) return '/complete-profile';
   return '/dashboard';
 }

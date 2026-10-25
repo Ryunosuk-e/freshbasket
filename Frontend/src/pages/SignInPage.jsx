@@ -24,6 +24,7 @@ function SignInPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [googleNotice, setGoogleNotice] = useState('');
+  const [forgotNotice, setForgotNotice] = useState(false);
 
   // Carried over from Register's redirect — e.g. "Account created." or the
   // vendor "pending verification" message. Cleared automatically since it
@@ -96,10 +97,27 @@ function SignInPage() {
             />
             Remember me
           </label>
-          <a href="#forgot-password" className="font-medium text-emerald-700 underline">
+          <button
+            type="button"
+            onClick={() => setForgotNotice((prev) => !prev)}
+            className="font-medium text-emerald-700 underline hover:text-emerald-800"
+          >
             Forgot Password?
-          </a>
+          </button>
         </div>
+
+        {forgotNotice && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            <p className="font-semibold">Resetting your account password</p>
+            <p className="mt-1 text-amber-800">
+              For security during pilot testing, please contact system administration at{' '}
+              <a href="mailto:admin@freshbasket.unn.edu.ng" className="underline font-medium">
+                admin@freshbasket.unn.edu.ng
+              </a>{' '}
+              or update your password inside your FreshBasket Profile Settings after signing in.
+            </p>
+          </div>
+        )}
 
         <button
           type="submit"
