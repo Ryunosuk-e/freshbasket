@@ -77,11 +77,24 @@ function formatDate(isoString) {
   });
 }
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, loading, icon: Icon }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-      <p className="text-2xl font-bold text-gray-900">{value ?? '—'}</p>
-      <p className="mt-1 text-xs text-gray-500">{label}</p>
+    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:border-emerald-200 transition">
+      <div className="flex items-center justify-between">
+        <p className="text-2xl font-black text-gray-900">
+          {loading ? (
+            <span className="inline-block h-7 w-8 animate-pulse rounded bg-gray-200" />
+          ) : (
+            Number(value ?? 0).toLocaleString()
+          )}
+        </p>
+        {Icon && (
+          <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+            <Icon size={18} />
+          </div>
+        )}
+      </div>
+      <p className="mt-1 text-xs font-medium text-gray-500">{label}</p>
     </div>
   );
 }
@@ -109,6 +122,7 @@ function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState('pending');
 
   const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Vendor approvals
   const [pendingVendors, setPendingVendors] = useState([]);
@@ -148,9 +162,19 @@ function AdminDashboardPage() {
   const [allOrdersError, setAllOrdersError] = useState('');
 
   const loadStats = () => {
+    setStatsLoading(true);
     getPlatformStats(token)
-      .then((data) => setStats(data.stats))
-      .catch(() => {});
+      .then((data) => {
+        if (data && data.stats) {
+          setStats(data.stats);
+        }
+      })
+      .catch((err) => {
+        console.error('getPlatformStats error:', err);
+      })
+      .finally(() => {
+        setStatsLoading(false);
+      });
   };
 
   const loadPending = () => {
@@ -309,11 +333,43 @@ function AdminDashboardPage() {
           </div>
 
           {/* Platform Stats Row */}
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label="Registered Customers" value={stats?.customersCount} />
-            <StatCard label="Pending Applications" value={stats?.pendingVendorsCount} />
-            <StatCard label="Verified Vendors" value={stats?.verifiedVendorsCount} />
-            <StatCard label="Platform Orders" value={stats?.totalOrdersCount ?? stats?.verifiedVendorsCount} />
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <StatCard
+              label="Registered Customers"
+              value={stats?.customersCount ?? stats?.total_customers}
+              loading={statsLoading}
+              icon={Users}
+            />
+            <StatCard
+              label="Pending Applications"
+              value={stats?.pendingVendorsCount ?? stats?.pending_vendors}
+              loading={statsLoading}
+              icon={Clock}
+            />
+            <StatCard
+              label="Verified Vendors"
+              value={stats?.verifiedVendorsCount ?? stats?.verified_vendors}
+              loading={statsLoading}
+              icon={Store}
+            />
+            <StatCard
+              label="Platform Orders"
+              value={stats?.totalOrdersCount ?? stats?.total_orders}
+              loading={statsLoading}
+              icon={Package}
+            />
+            <StatCard
+              label="Catalog Products"
+              value={stats?.productsCount ?? stats?.total_products}
+              loading={statsLoading}
+              icon={Tag}
+            />
+            <StatCard
+              label="Open Disputes"
+              value={stats?.openDisputesCount ?? stats?.open_disputes}
+              loading={statsLoading}
+              icon={AlertCircle}
+            />
           </div>
 
           {/* Navigation Tabs */}
