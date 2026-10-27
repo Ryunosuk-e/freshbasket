@@ -9,6 +9,7 @@ import {
   Sparkles,
   Store,
   Truck,
+  ShieldAlert,
 } from 'lucide-react';
 import AppHeader from '../components/AppHeader.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -21,6 +22,29 @@ function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50/50">
       <AppHeader />
+
+        {/* Vendor KYC Verification Banner */}
+        {isVendor && !user?.is_verified && (
+          <div className="mx-auto max-w-5xl px-6 sm:px-12 mt-6">
+            <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <ShieldAlert className="mt-0.5 shrink-0 text-amber-600" size={22} />
+              <div className="flex-1">
+                <h3 className="font-bold text-amber-900">KYC Verification Required</h3>
+                <p className="mt-1 text-sm text-amber-700">
+                  Your vendor account is active but you cannot list products or manage orders until your KYC verification is approved.
+                  Please submit your identification and business documents for review.
+                </p>
+                <Link
+                  to="/vendor/kyc"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white hover:bg-amber-700 transition shadow-sm"
+                >
+                  <ShieldAlert size={14} />
+                  Complete KYC Verification
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
       <main className="mx-auto max-w-5xl px-6 py-12 sm:px-12">
         {/* Welcome Banner */}

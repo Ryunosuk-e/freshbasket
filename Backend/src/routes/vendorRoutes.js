@@ -8,11 +8,15 @@ const {
   getMyProfile,
   updateMyProfile,
 } = require('../controllers/vendorController');
+const { submitKyc, getMyKyc } = require('../controllers/kycController');
 
 const router = express.Router();
 
-// IMPORTANT: /me is registered before /:vendorId — otherwise Express would
-// match "me" as a :vendorId value and these two routes would never run.
+// Vendor KYC Submissions
+router.get('/kyc', authenticate, authorize('vendor'), getMyKyc);
+router.post('/kyc', authenticate, authorize('vendor'), submitKyc);
+
+// IMPORTANT: /me is registered before /:vendorId
 router.get('/me', authenticate, authorize('vendor'), getMyProfile);
 router.patch('/me', authenticate, authorize('vendor'), updateMyProfile);
 

@@ -24,6 +24,7 @@ import { getProductReviews, submitReview } from '../api/reviews.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { getProductImageUrl, handleImageFallback } from '../utils/productImages.js';
+import { recordRecentlyViewed } from '../utils/recentlyViewed.js';
 
 function formatNaira(price) {
   const amount = Number(price);
@@ -93,6 +94,7 @@ function ProductDetailPage() {
       .then((data) => {
         const prod = data.product;
         setProduct(prod);
+        recordRecentlyViewed(prod);
         setActiveImage(0);
 
         // Parse and initialize packaging options

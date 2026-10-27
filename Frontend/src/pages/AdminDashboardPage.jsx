@@ -15,6 +15,7 @@ import {
   Tag,
   Users,
   X,
+  FileText,
 } from 'lucide-react';
 import AppHeader from '../components/AppHeader.jsx';
 import Footer from '../components/Footer.jsx';
@@ -38,6 +39,7 @@ import {
   resolveDispute,
 } from '../api/orders.js';
 import { getProductImageUrl, handleImageFallback } from '../utils/productImages.js';
+import { getAdminAllKyc, reviewAdminKyc } from '../api/kyc.js';
 
 function formatNaira(amount) {
   return `\u20a6${Number(amount).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -50,6 +52,7 @@ const TABS = [
   { key: 'orders', label: 'Platform Orders' },
   { key: 'vendors', label: 'All Vendors' },
   { key: 'customers', label: 'All Customers' },
+  { key: 'kyc', label: 'Vendor KYC' },
 ];
 
 const STATUS_STYLES = {
@@ -66,6 +69,7 @@ const STATUS_STYLES = {
   open: 'bg-rose-50 text-rose-700 border border-rose-200',
   resolved: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   dismissed: 'bg-gray-100 text-gray-700 border border-gray-200',
+  submitted: 'bg-blue-50 text-blue-700 border border-blue-200',
 };
 
 function formatDate(isoString) {
@@ -161,6 +165,12 @@ function AdminDashboardPage() {
   const [allOrdersLoading, setAllOrdersLoading] = useState(false);
   const [allOrdersError, setAllOrdersError] = useState('');
 
+  // KYC Submissions
+  const [kycList, setKycList] = useState(null);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [kycError, setKycError] = useState('');
+  const [reviewingKycId, setReviewingKycId] = useState(null);
+
   const loadStats = () => {
     setStatsLoading(true);
     getPlatformStats(token)
@@ -231,6 +241,15 @@ function AdminDashboardPage() {
       .finally(() => setAllOrdersLoading(false));
   };
 
+  const loadKyc = () => {
+    setKycLoading(true);
+    setKycError('');
+    getAdminAllKyc(token)
+      .then((data) => setKycList(data.submissions || []))
+      .catch((err) => setKycError(err.message || 'Could not load KYC submissions.'))
+      .finally(() => setKycLoading(false));
+  };
+
   useEffect(() => {
     loadStats();
     loadPending();
@@ -244,6 +263,7 @@ function AdminDashboardPage() {
     if (key === 'vendors' && allVendors === null) loadAllVendors();
     if (key === 'customers' && allCustomers === null) loadAllCustomers();
     if (key === 'orders' && allOrders === null) loadAllOrders();
+    if (key === 'kyc' && kycList === null) loadKyc();
   };
 
   const handleVendorDecision = async (vendorId, decision) => {
@@ -316,8 +336,26 @@ function AdminDashboardPage() {
     return (p.approval_status || 'approved') === productFilter;
   });
 
+  const handleKycReview = async (submissionId, decision) => {
+    const label = decision === 'approve' ? 'Approve' : 'Reject';
+    if (!window.confirm(`${label} this KYC submission?`)) return;
+    setReviewingKycId(submissionId);
+    try {
+      await reviewAdminKyc(token, submissionId, { decision });
+      const newStatus = decision === 'approve' ? 'approved' : 'rejected';
+      setKycList((prev) =>
+        prev.map((k) => (k.submission_id === submissionId ? { ...k, status: newStatus, reviewed_at: new Date().toISOString() } : k))
+      );
+    } catch (err) {
+      alert(err.message || `Failed to ${label} KYC submission.`);
+    } finally {
+      setReviewingKycId(null);
+    }
+  };
+
   const pendingDisputesCount = (disputes || []).filter((d) => d.status === 'open').length;
   const pendingProductsCount = (allProducts || []).filter((p) => p.approval_status === 'pending').length;
+  const pendingKycCount = (kycList || []).filter((k) => k.status === 'submitted').length;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-between">
@@ -380,6 +418,7 @@ function AdminDashboardPage() {
               if (tab.key === 'pending') badgeCount = pendingVendors.length;
               if (tab.key === 'products') badgeCount = pendingProductsCount;
               if (tab.key === 'disputes') badgeCount = pendingDisputesCount;
+              if (tab.key === 'kyc') badgeCount = pendingKycCount;
 
               return (
                 <button
@@ -825,6 +864,108 @@ function AdminDashboardPage() {
                 )}
               </>
             )}
+
+            {/* TAB 7: VENDOR KYC */}
+            {activeTab === 'kyc' && (
+              <>
+                {kycLoading ? (
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="animate-spin text-emerald-700" size={28} />
+                  </div>
+                ) : kycError ? (
+                  <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700 border border-red-200">
+                    {kycError}
+                  </div>
+                ) : !kycList || kycList.length === 0 ? (
+                  <EmptyState
+                    icon={FileText}
+                    title="No KYC Submissions"
+                    subtitle="No vendor KYC applications have been submitted yet."
+                  />
+                ) : (
+                  <ul className="space-y-4">
+                    {kycList.map((kyc) => (
+                      <li
+                        key={kyc.submission_id}
+                        className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm hover:border-emerald-200 transition"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-gray-900">{kyc.full_name || kyc.shop_name || `Vendor #${kyc.vendor_id}`}</h3>
+                              <StatusBadge status={kyc.status} />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-600">
+                              <p><span className="font-semibold text-gray-800">NIN:</span> {kyc.nin || '—'}</p>
+                              <p><span className="font-semibold text-gray-800">ID Type:</span> {(kyc.id_type || '—').replace(/_/g, ' ')}</p>
+                              <p><span className="font-semibold text-gray-800">Business Name:</span> {kyc.business_name || '—'}</p>
+                              <p><span className="font-semibold text-gray-800">Market Zone:</span> {kyc.market_zone || '—'}</p>
+                              <p><span className="font-semibold text-gray-800">Stall/Shop #:</span> {kyc.stall_number || '—'}</p>
+                              <p><span className="font-semibold text-gray-800">Bank:</span> {kyc.bank_name || '—'}</p>
+                              <p><span className="font-semibold text-gray-800">Account #:</span> {kyc.account_number || '—'}</p>
+                              <p><span className="font-semibold text-gray-800">Account Name:</span> {kyc.account_name || '—'}</p>
+                            </div>
+                            {kyc.id_document_url && (
+                              <p className="text-xs">
+                                <a
+                                  href={kyc.id_document_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-700 underline hover:text-emerald-800"
+                                >
+                                  View ID Document
+                                </a>
+                              </p>
+                            )}
+                            {kyc.stall_proof_url && (
+                              <p className="text-xs">
+                                <a
+                                  href={kyc.stall_proof_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-emerald-700 underline hover:text-emerald-800"
+                                >
+                                  View Stall / Business Proof
+                                </a>
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-400">Submitted: {formatDate(kyc.submitted_at || kyc.created_at)}</p>
+                            {kyc.reviewed_at && (
+                              <p className="text-xs text-gray-400">Reviewed: {formatDate(kyc.reviewed_at)}</p>
+                            )}
+                            {kyc.rejection_reason && (
+                              <p className="text-xs text-gray-500 italic">Rejection reason: {kyc.rejection_reason}</p>
+                            )}
+                          </div>
+                          {kyc.status === 'submitted' && (
+                            <div className="flex gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleKycReview(kyc.submission_id, 'approve')}
+                                disabled={reviewingKycId === kyc.submission_id}
+                                className="flex items-center gap-1 rounded-full bg-emerald-800 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition disabled:opacity-50 shadow"
+                              >
+                                <Check size={14} />
+                                Approve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleKycReview(kyc.submission_id, 'reject')}
+                                disabled={reviewingKycId === kyc.submission_id}
+                                className="flex items-center gap-1 rounded-full border border-red-200 px-4 py-2 text-xs font-bold text-red-700 hover:bg-red-50 transition disabled:opacity-50"
+                              >
+                                <X size={14} />
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
           </div>
 
           <button
@@ -837,6 +978,7 @@ function AdminDashboardPage() {
               if (activeTab === 'vendors') loadAllVendors();
               if (activeTab === 'customers') loadAllCustomers();
               if (activeTab === 'orders') loadAllOrders();
+              if (activeTab === 'kyc') loadKyc();
             }}
             className="mt-8 flex items-center gap-2 text-sm font-semibold text-emerald-800 hover:text-emerald-900"
           >

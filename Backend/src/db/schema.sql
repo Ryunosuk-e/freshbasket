@@ -282,3 +282,52 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_recipient_id ON notifications(recipient_id);
+
+
+-- ---------------------------------------------------------------------
+-- Notifications & Mail Subsystem (FR12) Updates
+-- ---------------------------------------------------------------------
+
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS title VARCHAR(150);
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+
+DO $$ BEGIN
+    ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_channel_check;
+    ALTER TABLE notifications ADD CONSTRAINT notifications_channel_check
+        CHECK (channel IN ('push', 'sms', 'in_app', 'email', 'whatsapp'));
+EXCEPTION
+    WHEN others THEN NULL;
+END $$;
+
+-- ---------------------------------------------------------------------
+-- Sprint 6: Vendor KYC Submissions (Multi-tier Verification & Moderation)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS vendor_kyc_submissions (
+    submission_id      SERIAL PRIMARY KEY,
+    vendor_id          INTEGER NOT NULL REFERENCES vendors(vendor_id) ON DELETE CASCADE,
+    full_name          VARCHAR(150) NOT NULL,
+    nin                VARCHAR(20) NOT NULL,
+    phone_number       VARCHAR(25) NOT NULL,
+    residential_address TEXT NOT NULL,
+    id_type            VARCHAR(50) NOT NULL DEFAULT 'NIN Slip',
+    id_document_url    TEXT NOT NULL,
+    passport_photo_url TEXT,
+    business_name      VARCHAR(150) NOT NULL,
+    market_zone        VARCHAR(80) NOT NULL DEFAULT 'Ogige Market',
+    stall_location     VARCHAR(255) NOT NULL,
+    business_category  VARCHAR(100),
+    cac_number         VARCHAR(50),
+    stall_proof_url    TEXT,
+    bank_name          VARCHAR(100) NOT NULL,
+    account_number     VARCHAR(20) NOT NULL,
+    account_name       VARCHAR(150) NOT NULL,
+    status             VARCHAR(20) NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'approved', 'rejected')),
+    rejection_reason   TEXT,
+    submitted_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_at        TIMESTAMPTZ,
+    reviewed_by        INTEGER REFERENCES users(user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kyc_vendor_id ON vendor_kyc_submissions(vendor_id);
+CREATE INDEX IF NOT EXISTS idx_kyc_status ON vendor_kyc_submissions(status);

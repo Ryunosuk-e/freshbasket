@@ -1,12 +1,13 @@
 const pool = require('../config/db');
 const { getCartWithItems } = require('./cartModel');
+const { notifyDriverAssignment } = require('../utils/dispatchNotifications');
 
 // Recomputed from the CURRENT cart server-side, always — a client-supplied
 // total is never trusted.
 const computeCartTotal = (items) =>
   items.reduce((sum, item) => sum + Number(item.unit_price || item.price) * item.quantity, 0);
 
-const DELIVERY_FEE = 500.0; // Local Nsukka flat delivery rate
+const DELIVERY_FEE = 1200.0; // Local Nsukka flat delivery rate
 
 const generateOrderCode = () => {
   const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -42,7 +43,7 @@ const createOrderFromCart = async ({
   try {
     await client.query('BEGIN');
 
-    // 1. Create order record with Jumia-style alphanumeric code
+    // 1. Create order record with alphanumeric code
     const orderResult = await client.query(
       `INSERT INTO orders (
          order_code, customer_id, delivery_address, fulfillment_type,
@@ -97,11 +98,12 @@ const createOrderFromCart = async ({
     await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
 
     // 4. Delivery Agent Assignment (Only if home delivery requested)
+    let assignedAgentId = null;
     if (isDelivery) {
       const agentRes = await client.query(
         `SELECT agent_id FROM delivery_agents WHERE current_status = 'available' LIMIT 1`
       );
-      const assignedAgentId = agentRes.rows[0]?.agent_id || null;
+      assignedAgentId = agentRes.rows[0]?.agent_id || null;
 
       await client.query(
         `INSERT INTO delivery_assignments (order_id, agent_id, delivery_address, status)
@@ -119,17 +121,29 @@ const createOrderFromCart = async ({
 
     // 5. In-App Notifications (FR12)
     await client.query(
-      `INSERT INTO notifications (recipient_id, channel, type, message)
-       VALUES ($1, 'in_app', 'order_placed', $2)`,
+      `INSERT INTO notifications (recipient_id, channel, type, title, message)
+       VALUES ($1, 'in_app', 'order_placed', 'Order Placed Successfully', $2)`,
       [customerId, `Order ${finalOrderCode} placed successfully. Total: ₦${totalWithDelivery.toLocaleString()}`]
     );
 
     for (const vId of vendorIds) {
       await client.query(
-        `INSERT INTO notifications (recipient_id, channel, type, message)
-         VALUES ($1, 'in_app', 'new_order', $2)`,
+        `INSERT INTO notifications (recipient_id, channel, type, title, message)
+         VALUES ($1, 'in_app', 'new_order', 'New Customer Order Received', $2)`,
         [vId, `New order ${finalOrderCode} received for your store items.`]
       );
+    }
+
+    // 6. Notify Driver via Multi-Channel (SMS, WhatsApp, Email, In-App)
+    if (assignedAgentId) {
+      notifyDriverAssignment({
+        agentId: assignedAgentId,
+        orderCode: finalOrderCode,
+        pickupAddress: 'Ogige Market Vendor Stalls',
+        deliveryAddress,
+        customerName: 'Customer',
+        totalAmount: totalWithDelivery,
+      }).catch((err) => console.error('Driver assignment dispatch error:', err));
     }
 
     await client.query('COMMIT');
@@ -141,6 +155,7 @@ const createOrderFromCart = async ({
     client.release();
   }
 };
+
 const findOrderById = async (orderId, customerId = null) => {
   const query = customerId
     ? `SELECT order_id, order_code, customer_id, delivery_address, fulfillment_type, payment_method,
@@ -261,7 +276,6 @@ const updateOrderStatus = async (orderId, newStatus, vendorId = null) => {
     }
   }
 
-  // If status is updated to 'delivered' and payment was cash, automatically confirm payment as paid
   const result = await pool.query(
     `UPDATE orders
      SET order_status = $2,
@@ -273,12 +287,11 @@ const updateOrderStatus = async (orderId, newStatus, vendorId = null) => {
   );
   const order = result.rows[0];
 
-  // Dispatch notification to customer (FR12)
   if (order) {
     const displayCode = order.order_code || `#${orderId}`;
     await pool.query(
-      `INSERT INTO notifications (recipient_id, channel, type, message)
-       VALUES ($1, 'in_app', 'order_status_update', $2)`,
+      `INSERT INTO notifications (recipient_id, channel, type, title, message)
+       VALUES ($1, 'in_app', 'order_status_update', 'Order Status Update', $2)`,
       [order.customer_id, `Your order ${displayCode} status has been updated to "${newStatus.replace('_', ' ')}".`]
     );
   }
@@ -286,7 +299,6 @@ const updateOrderStatus = async (orderId, newStatus, vendorId = null) => {
   return order;
 };
 
-// Confirm payment for an order (e.g. cash on delivery or bank transfer received)
 const confirmPaymentReceived = async (orderId, actorId = null) => {
   const result = await pool.query(
     `UPDATE orders SET payment_status = 'paid', updated_at = NOW() WHERE order_id = $1 RETURNING *`,
@@ -297,8 +309,8 @@ const confirmPaymentReceived = async (orderId, actorId = null) => {
 
   const displayCode = order.order_code || `#${orderId}`;
   await pool.query(
-    `INSERT INTO notifications (recipient_id, channel, type, message)
-     VALUES ($1, 'in_app', 'payment_confirmed', $2)`,
+    `INSERT INTO notifications (recipient_id, channel, type, title, message)
+     VALUES ($1, 'in_app', 'payment_confirmed', 'Payment Confirmed', $2)`,
     [order.customer_id, `Payment for order ${displayCode} has been confirmed received.`]
   );
 

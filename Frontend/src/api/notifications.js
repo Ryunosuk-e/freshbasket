@@ -19,3 +19,10 @@ export function markAllNotificationsRead(token) {
     headers: authHeaders(token),
   }).then(parseResponse);
 }
+
+export function deleteNotification(token, notificationId) {
+  return fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  }).then(parseResponse);
+}

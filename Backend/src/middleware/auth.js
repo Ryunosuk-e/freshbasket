@@ -1,4 +1,5 @@
 const { verifyToken } = require('../utils/token');
+const pool = require('../config/db');
 
 // Reads "Authorization: Bearer <token>", verifies it, and attaches the
 // decoded { userId, role } to req.user for downstream handlers.
@@ -28,4 +29,25 @@ const authorize = (...allowedRoles) => {
   };
 };
 
-module.exports = { authenticate, authorize };
+// Checks that the authenticated vendor has passed KYC verification.
+// Must run after `authenticate` and `authorize('vendor')`.
+const requireVerifiedVendor = async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT is_verified FROM users WHERE user_id = $1',
+      [req.user.userId]
+    );
+    if (!rows.length || !rows[0].is_verified) {
+      return res.status(403).json({
+        message: 'Your vendor account requires KYC verification before you can perform this action. Please complete your KYC at the Vendor KYC page.',
+        code: 'KYC_REQUIRED',
+      });
+    }
+    next();
+  } catch (err) {
+    console.error('requireVerifiedVendor error:', err);
+    return res.status(500).json({ message: 'Internal server error.' });
+  }
+};
+
+module.exports = { authenticate, authorize, requireVerifiedVendor };
