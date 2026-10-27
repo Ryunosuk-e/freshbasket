@@ -16,6 +16,9 @@ import CheckoutPage from './pages/CheckoutPage.jsx';
 import OrdersPage from './pages/OrdersPage.jsx';
 import OrderDetailPage from './pages/OrderDetailPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
+import MailPage from './pages/MailPage.jsx';
+import WishlistPage from './pages/WishlistPage.jsx';
+import VendorKycPage from './pages/VendorKycPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import MobileBottomNav from './components/MobileBottomNav.jsx';
@@ -71,6 +74,14 @@ function App() {
           }
         />
         <Route
+          path="/vendor/kyc"
+          element={
+            <ProtectedRoute allowedRoles={['vendor']}>
+              <VendorKycPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/agent/deliveries"
           element={
             <ProtectedRoute allowedRoles={['agent']}>
@@ -109,6 +120,18 @@ function App() {
               <OrderDetailPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/mail"
+          element={
+            <ProtectedRoute allowedRoles={['customer', 'vendor', 'admin', 'agent']}>
+              <MailPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wishlist"
+          element={<WishlistPage />}
         />
         <Route
           path="/profile"

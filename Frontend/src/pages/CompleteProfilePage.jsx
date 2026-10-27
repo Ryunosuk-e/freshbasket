@@ -154,7 +154,7 @@ function CompleteProfilePage() {
           preferredPaymentMethod: preferredPaymentMethod || undefined,
         });
         updateUser({ profile_completed: true });
-        navigate('/dashboard', { replace: true });
+        navigate('/', { replace: true });
       } catch (err) {
         setErrorMessage(err.message || 'Something went wrong. Please try again.');
         setIsSubmitting(false);

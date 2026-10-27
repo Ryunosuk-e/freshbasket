@@ -4,6 +4,7 @@ import AuthLayout from '../components/AuthLayout.jsx';
 import FormField from '../components/FormField.jsx';
 import GoogleIcon from '../components/GoogleIcon.jsx';
 import { registerCustomer, registerVendor } from '../api/auth.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const ROLE_COPY = {
   customer: {
@@ -37,6 +38,7 @@ function validate(role, formData, agree) {
 function RegisterPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login } = useAuth();
   const [role, setRole] = useState(location.state?.role === 'vendor' ? 'vendor' : 'customer');
   const [formData, setFormData] = useState({
     fullName: '',
@@ -80,17 +82,24 @@ function RegisterPage() {
 
     setIsSubmitting(true);
     try {
-      let result;
       if (role === 'customer') {
-        result = await registerCustomer({
+        const result = await registerCustomer({
           fullName: formData.fullName,
           email: formData.email,
           phoneNumber: formData.phoneNumber,
           password: formData.password,
           deliveryAddress: formData.deliveryAddress || undefined,
         });
+
+        if (result.token && result.user) {
+          login(result.user, result.token, true);
+          // Redirect customer to the landing page as requested
+          navigate('/', { replace: true, state: { welcomeMessage: 'Account created successfully! Welcome to FreshBasket.' } });
+          return;
+        }
+        navigate('/sign-in', { state: { message: result.message || 'Account created! Please sign in.' } });
       } else {
-        result = await registerVendor({
+        const result = await registerVendor({
           ownerName: formData.ownerName,
           email: formData.email,
           phoneNumber: formData.phoneNumber,
@@ -99,10 +108,19 @@ function RegisterPage() {
           businessAddress: formData.businessAddress,
           category: formData.category || undefined,
         });
+
+        if (result.token && (result.user || result.vendor)) {
+          const vendorUser = result.user || result.vendor;
+          login(vendorUser, result.token, true);
+          // Redirect newly registered vendor to KYC page to complete verification
+          navigate('/vendor/kyc', {
+            replace: true,
+            state: { message: 'Vendor account created! Please submit your KYC verification to begin listing products.' },
+          });
+          return;
+        }
+        navigate('/sign-in', { state: { message: result.message || 'Registration submitted! Please sign in.' } });
       }
-      // Registering doesn't log you in — you sign in with the new
-      // credentials next, same as the rest of the flow the user asked for.
-      navigate('/sign-in', { state: { message: result.message } });
     } catch (err) {
       setErrorMessage(err.message || 'Something went wrong. Please try again.');
       setIsSubmitting(false);
