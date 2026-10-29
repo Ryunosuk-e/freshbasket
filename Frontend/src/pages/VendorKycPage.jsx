@@ -8,12 +8,12 @@ import {
   AlertCircle,
   FileText,
   Building2,
-  CreditCard,
   User,
   ArrowRight,
   UploadCloud,
   Loader2,
-  Check,
+  Trash2,
+  Eye,
 } from 'lucide-react';
 import AppHeader from '../components/AppHeader.jsx';
 import Footer from '../components/Footer.jsx';
@@ -29,21 +29,192 @@ const MARKET_ZONES = [
   'UNN Campus Environs',
 ];
 
-const NIGERIAN_BANKS = [
-  'Access Bank',
-  'First Bank of Nigeria',
-  'Guaranty Trust Bank (GTBank)',
-  'United Bank for Africa (UBA)',
-  'Zenith Bank',
-  'Fidelity Bank',
-  'Stanbic IBTC Bank',
-  'Union Bank',
-  'Wema Bank (ALAT)',
-  'OPay (PayCom)',
-  'Palmpay',
-  'Kuda Microfinance Bank',
-  'Moniepoint MFB',
-];
+// Helper to convert an uploaded image/document into a data URL
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve('');
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+function FileDropZone({
+  id,
+  label,
+  sublabel,
+  value,
+  fileName,
+  onFileSelect,
+  onClear,
+  required = false,
+  accept = 'image/*,application/pdf',
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      onFileSelect(files[0]);
+    }
+  };
+
+  const handleInputChange = (e) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      onFileSelect(files[0]);
+    }
+  };
+
+  const isImage = value && (value.startsWith('data:image/') || value.match(/\.(jpeg|jpg|gif|png|webp)/i));
+
+  return (
+    <div>
+      <label className="block text-xs font-bold text-gray-700 mb-1.5">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+
+      {value ? (
+        <div className="relative flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 transition">
+          <div className="flex items-center gap-3 min-w-0">
+            {isImage ? (
+              <img
+                src={value}
+                alt="Document preview"
+                className="h-14 w-14 shrink-0 rounded-xl object-cover border border-emerald-300 shadow-xs"
+              />
+            ) : (
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
+                <FileText size={24} />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-emerald-700 shrink-0" />
+                <span className="text-xs font-bold text-emerald-950 truncate">
+                  {fileName || 'Document attached'}
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] text-emerald-800/80">
+                File loaded successfully and ready for verification
+              </p>
+              {value.startsWith('http') && (
+                <a
+                  href={value}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-900 underline"
+                >
+                  <Eye size={12} /> View uploaded document
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 ml-3">
+            <label
+              htmlFor={id}
+              className="cursor-pointer rounded-full bg-white border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 shadow-xs transition"
+            >
+              Replace
+            </label>
+            <button
+              type="button"
+              onClick={onClear}
+              className="rounded-full p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition"
+              title="Remove file"
+            >
+              <Trash2 size={16} />
+            </button>
+            <input
+              id={id}
+              type="file"
+              accept={accept}
+              onChange={handleInputChange}
+              className="hidden"
+            />
+          </div>
+        </div>
+      ) : (
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => document.getElementById(id)?.click()}
+          className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition cursor-pointer ${
+            isDragging
+              ? 'border-emerald-600 bg-emerald-50/50'
+              : 'border-gray-200 bg-gray-50/50 hover:border-emerald-400 hover:bg-emerald-50/20'
+          }`}
+        >
+          <input
+            id={id}
+            type="file"
+            accept={accept}
+            onChange={handleInputChange}
+            className="hidden"
+          />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-emerald-700 shadow-xs border border-gray-100 mb-2">
+            <UploadCloud size={24} />
+          </div>
+          <p className="text-xs font-semibold text-gray-800">
+            <span className="text-emerald-800 font-bold hover:underline">Click to browse file</span> or drag & drop here
+          </p>
+          <p className="mt-1 text-[11px] text-gray-500">
+            {sublabel || 'Supports JPG, PNG, WEBP, or PDF (up to 5MB)'}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function VendorKycPage() {
   const { user, token } = useAuth();
@@ -55,7 +226,11 @@ export default function VendorKycPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Form State
+  // Attached file display names
+  const [idDocumentFileName, setIdDocumentFileName] = useState('');
+  const [stallProofFileName, setStallProofFileName] = useState('');
+
+  // Form State (Personal & Business Stall details only - Bank info is pre-recorded)
   const [formData, setFormData] = useState({
     fullName: user?.full_name || '',
     nin: '',
@@ -70,9 +245,6 @@ export default function VendorKycPage() {
     businessCategory: 'Fruits & Vegetables',
     cacNumber: '',
     stallProofUrl: '',
-    bankName: 'First Bank of Nigeria',
-    accountNumber: '',
-    accountName: '',
   });
 
   const loadKyc = async () => {
@@ -96,10 +268,13 @@ export default function VendorKycPage() {
           businessCategory: data.submission.business_category || 'Fruits & Vegetables',
           cacNumber: data.submission.cac_number || '',
           stallProofUrl: data.submission.stall_proof_url || '',
-          bankName: data.submission.bank_name || 'First Bank of Nigeria',
-          accountNumber: data.submission.account_number || '',
-          accountName: data.submission.account_name || '',
         });
+        if (data.submission.id_document_url) {
+          setIdDocumentFileName('ID_Document_Uploaded');
+        }
+        if (data.submission.stall_proof_url) {
+          setStallProofFileName('Stall_Proof_Uploaded');
+        }
       }
     } catch (err) {
       console.error('loadKyc error:', err);
@@ -116,6 +291,30 @@ export default function VendorKycPage() {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
+  const handleIdDocumentFile = async (file) => {
+    if (!file) return;
+    try {
+      setIdDocumentFileName(file.name);
+      const dataUrl = await fileToDataUrl(file);
+      setFormData((prev) => ({ ...prev, idDocumentUrl: dataUrl }));
+    } catch (err) {
+      console.error('Error reading ID document file:', err);
+      setErrorMessage('Could not load selected ID document file.');
+    }
+  };
+
+  const handleStallProofFile = async (file) => {
+    if (!file) return;
+    try {
+      setStallProofFileName(file.name);
+      const dataUrl = await fileToDataUrl(file);
+      setFormData((prev) => ({ ...prev, stallProofUrl: dataUrl }));
+    } catch (err) {
+      console.error('Error reading stall proof file:', err);
+      setErrorMessage('Could not load selected stall proof file.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
@@ -127,22 +326,20 @@ export default function VendorKycPage() {
       !formData.phoneNumber.trim() ||
       !formData.residentialAddress.trim() ||
       !formData.businessName.trim() ||
-      !formData.stallLocation.trim() ||
-      !formData.accountNumber.trim() ||
-      !formData.accountName.trim()
+      !formData.stallLocation.trim()
     ) {
-      setErrorMessage('Please fill in all required fields.');
+      setErrorMessage('Please fill in all required personal and stall details.');
       return;
     }
 
     if (formData.nin.trim().length < 11) {
-      setErrorMessage('NIN must be 11 digits.');
+      setErrorMessage('National Identification Number (NIN) must be at least 11 digits.');
       return;
     }
 
-    if (!formData.idDocumentUrl.trim()) {
-      // Default to a placeholder if user didn't enter custom doc URL
-      formData.idDocumentUrl = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80';
+    if (!formData.idDocumentUrl) {
+      setErrorMessage('Please upload or attach your means of identification (NIN slip, card, or license).');
+      return;
     }
 
     setIsSubmitting(true);
@@ -165,7 +362,7 @@ export default function VendorKycPage() {
 
         <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Header Banner */}
-          <div className="rounded-3xl bg-gradient-to-r from-emerald-900 to-emerald-800 p-8 text-white shadow-xl">
+          <div className="rounded-3xl bg-linear-to-r from-emerald-900 to-emerald-800 p-8 text-white shadow-xl">
             <div className="flex items-center gap-3">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md">
                 <ShieldCheck size={26} className="text-emerald-300" />
@@ -317,18 +514,21 @@ export default function VendorKycPage() {
                   />
                 </div>
 
+                {/* File Upload for ID Document */}
                 <div className="sm:col-span-2">
-                  <FormField
-                    id="idDocumentUrl"
-                    label="ID Document Link or Photo Reference"
+                  <FileDropZone
+                    id="idDocumentFile"
+                    label="Upload Means of Identification (NIN Slip, Voters Card, Driver's License or Passport)"
+                    sublabel="Drag & drop or click to select your photo or PDF document (max 5MB)"
                     value={formData.idDocumentUrl}
-                    onChange={updateField('idDocumentUrl')}
-                    placeholder="Paste image link to uploaded NIN slip or ID document"
-                    required={false}
+                    fileName={idDocumentFileName}
+                    required={true}
+                    onFileSelect={handleIdDocumentFile}
+                    onClear={() => {
+                      setIdDocumentFileName('');
+                      setFormData((prev) => ({ ...prev, idDocumentUrl: '' }));
+                    }}
                   />
-                  <p className="mt-1 text-[11px] text-gray-400">
-                    You can paste a direct photo link (e.g., Imgur, Google Drive, or Cloudinary).
-                  </p>
                 </div>
               </div>
             </div>
@@ -397,63 +597,20 @@ export default function VendorKycPage() {
                   required={false}
                 />
 
+                {/* File Upload for Stall Proof */}
                 <div className="sm:col-span-2">
-                  <FormField
-                    id="stallProofUrl"
-                    label="Proof of Market Stall (Levy Ticket, Lease or Photo)"
+                  <FileDropZone
+                    id="stallProofFile"
+                    label="Proof of Market Stall (Levy Ticket, Shop Lease, or Stall Photo)"
+                    sublabel="Drag & drop or click to select market union ticket, shop photo, or lease document (max 5MB)"
                     value={formData.stallProofUrl}
-                    onChange={updateField('stallProofUrl')}
-                    placeholder="Link to market union ticket, shop photo, or utility document"
+                    fileName={stallProofFileName}
                     required={false}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Payout Bank Account Details */}
-            <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-8 shadow-xs">
-              <div className="flex items-center gap-2.5 pb-4 border-b border-gray-100">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
-                  <CreditCard size={16} />
-                </span>
-                <h2 className="text-base font-bold text-gray-900">3. Bank Account for Order Payouts</h2>
-              </div>
-
-              <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="bankName" className="block text-xs font-bold text-gray-700 mb-1.5">
-                    Settlement Bank
-                  </label>
-                  <select
-                    id="bankName"
-                    value={formData.bankName}
-                    onChange={updateField('bankName')}
-                    className="w-full rounded-2xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:border-emerald-600"
-                  >
-                    {NIGERIAN_BANKS.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <FormField
-                  id="accountNumber"
-                  label="10-Digit NUBAN Account Number"
-                  value={formData.accountNumber}
-                  onChange={updateField('accountNumber')}
-                  placeholder="0123456789"
-                  maxLength={10}
-                />
-
-                <div className="sm:col-span-2">
-                  <FormField
-                    id="accountName"
-                    label="Account Name (Must match legal name on NIN)"
-                    value={formData.accountName}
-                    onChange={updateField('accountName')}
-                    placeholder="e.g. NGOZI OKAFOR"
+                    onFileSelect={handleStallProofFile}
+                    onClear={() => {
+                      setStallProofFileName('');
+                      setFormData((prev) => ({ ...prev, stallProofUrl: '' }));
+                    }}
                   />
                 </div>
               </div>

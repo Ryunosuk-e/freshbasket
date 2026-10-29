@@ -20,6 +20,26 @@ const submitKycApplication = async ({
   accountNumber,
   accountName,
 }) => {
+  let finalBankName = bankName;
+  let finalAccountNumber = accountNumber;
+  let finalAccountName = accountName;
+
+  if (!finalBankName || !finalAccountNumber || !finalAccountName) {
+    const vRes = await pool.query('SELECT bank_details FROM vendors WHERE vendor_id = $1', [vendorId]);
+    if (vRes.rows.length && vRes.rows[0].bank_details) {
+      const bd = typeof vRes.rows[0].bank_details === 'string'
+        ? JSON.parse(vRes.rows[0].bank_details)
+        : vRes.rows[0].bank_details;
+      finalBankName = finalBankName || bd.bankName || bd.bank_name || 'Registered Bank Account';
+      finalAccountNumber = finalAccountNumber || bd.accountNumber || bd.account_number || 'Registered';
+      finalAccountName = finalAccountName || bd.accountName || bd.account_name || fullName;
+    } else {
+      finalBankName = finalBankName || 'Registered Bank Account';
+      finalAccountNumber = finalAccountNumber || 'Registered';
+      finalAccountName = finalAccountName || fullName;
+    }
+  }
+
   // Check if an existing submission exists for this vendor
   const existing = await pool.query(
     'SELECT submission_id FROM vendor_kyc_submissions WHERE vendor_id = $1 ORDER BY submitted_at DESC LIMIT 1',
@@ -52,9 +72,9 @@ const submitKycApplication = async ({
         businessCategory || null,
         cacNumber || null,
         stallProofUrl || null,
-        bankName,
-        accountNumber,
-        accountName,
+        finalBankName,
+        finalAccountNumber,
+        finalAccountName,
         subId,
       ]
     );
@@ -86,9 +106,9 @@ const submitKycApplication = async ({
       businessCategory || null,
       cacNumber || null,
       stallProofUrl || null,
-      bankName,
-      accountNumber,
-      accountName,
+      finalBankName,
+      finalAccountNumber,
+      finalAccountName,
     ]
   );
   return res.rows[0];

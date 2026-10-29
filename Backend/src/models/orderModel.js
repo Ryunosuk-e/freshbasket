@@ -278,8 +278,8 @@ const updateOrderStatus = async (orderId, newStatus, vendorId = null) => {
 
   const result = await pool.query(
     `UPDATE orders
-     SET order_status = $2,
-         payment_status = CASE WHEN $2 = 'delivered' AND payment_status = 'pending' THEN 'paid' ELSE payment_status END,
+     SET order_status = $2::varchar,
+         payment_status = CASE WHEN $2::varchar = 'delivered' AND payment_status = 'pending' THEN 'paid' ELSE payment_status END,
          updated_at = NOW()
      WHERE order_id = $1
      RETURNING *`,

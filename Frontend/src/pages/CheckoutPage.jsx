@@ -227,7 +227,7 @@ function CheckoutPage() {
                         <span>Home / Hostel Delivery</span>
                       </div>
                       <p className="mt-1 text-[11px] text-gray-500 leading-relaxed">
-                        Delivered to UNN Hostels (Bello, Franco, Okpara), Hilltop, or Behind Flat (₦500.00).
+                        Delivered to UNN Hostels (Bello, Franco, Okpara), Hilltop, or Behind Flat (₦1,200.00).
                       </p>
                     </div>
                   </label>

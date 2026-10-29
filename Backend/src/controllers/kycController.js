@@ -35,13 +35,10 @@ const submitKyc = async (req, res) => {
       !residentialAddress ||
       !idDocumentUrl ||
       !businessName ||
-      !stallLocation ||
-      !bankName ||
-      !accountNumber ||
-      !accountName
+      !stallLocation
     ) {
       return res.status(400).json({
-        message: 'Please provide all required personal, business, document, and banking details.',
+        message: 'Please provide all required personal, business, and document details.',
       });
     }
 
