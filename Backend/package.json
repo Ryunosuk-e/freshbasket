@@ -4,6 +4,7 @@
   "description": "Auth, Vendor Registration & Product Catalogue for the Online Grocery Market Platform (final year project)",
   "main": "src/server.js",
   "scripts": {
+    "build": "node --check src/server.js",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "node tests/api.test.js",

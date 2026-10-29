@@ -23,7 +23,8 @@ const app = express();
 // 201 42.318 ms" — this is what lets you watch requests arrive in real time.
 app.use(morgan('dev'));
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  // origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: '*',
   credentials: true,
 }));
 app.use(express.json());

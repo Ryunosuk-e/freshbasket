@@ -11,6 +11,12 @@ This repository contains both the client application and server:
 
 ## Quick Setup
 
+### Build the Frontend
+From the repository root, run:
+```bash
+npm run build
+```
+
 ### 1. Backend Setup
 ```bash
 cd Backend
@@ -36,4 +42,3 @@ cp .env.example .env
 # Start Vite development server
 npm run dev
 ```
-
